@@ -36,6 +36,7 @@ jobs:
       PROJECT: qoq.xcodeproj
       TEAM_ID: 4SGGP72YQZ
       TAP_REPOSITORY: chensiyue98/homebrew-tap
+      TAP_NAME: chensiyue98/tap
 
     steps:
       - name: Checkout
@@ -367,20 +368,11 @@ jobs:
           git diff --check
           git diff -- "$CASK_PATH"
 
-      - name: Audit Homebrew Cask
-        if: ${{ inputs.prerelease == false }}
-        shell: bash
-        working-directory: homebrew-tap
-        run: |
-          set -euo pipefail
-          brew audit --cask --strict ./Casks/qoq.rb
-
-      - name: Create Homebrew Cask update PR
+      - name: Commit Homebrew Cask update
         if: ${{ inputs.prerelease == false }}
         shell: bash
         working-directory: homebrew-tap
         env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           VERSION: ${{ steps.homebrew.outputs.version }}
         run: |
           set -euo pipefail
@@ -394,6 +386,30 @@ jobs:
           git switch -c "$BRANCH"
           git add Casks/qoq.rb
           git commit -m "Update QoQ to $VERSION"
+
+      - name: Audit Homebrew Cask
+        if: ${{ inputs.prerelease == false }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          brew untap "$TAP_NAME" >/dev/null 2>&1 || true
+          brew tap "$TAP_NAME" "$GITHUB_WORKSPACE/homebrew-tap"
+          trap 'brew untap "$TAP_NAME" >/dev/null 2>&1 || true' EXIT
+
+          brew audit --cask --strict qoq
+
+      - name: Create Homebrew Cask update PR
+        if: ${{ inputs.prerelease == false }}
+        shell: bash
+        working-directory: homebrew-tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.homebrew.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="update-qoq-$VERSION"
           git push --set-upstream origin "$BRANCH"
 
           gh pr create \
