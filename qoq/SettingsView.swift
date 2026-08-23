@@ -104,6 +104,10 @@ struct SettingsView: View {
     @ObservedObject var model: TranslationModel
     @ObservedObject var shortcuts: ShortcutPreferences
     @StateObject private var offlineLanguages = OfflineLanguageManager()
+    @AppStorage("translationWindowPosition") private var translationWindowPosition = TranslationWindowPosition.screenCenter.rawValue
+    @AppStorage("translationAppearanceMode") private var translationAppearanceMode = TranslationAppearanceMode.automatic.rawValue
+    @AppStorage("translationBackgroundOpacity") private var translationBackgroundOpacity = 0.82
+    @AppStorage("translationBackgroundBlur") private var translationBackgroundBlur = TranslationBackgroundBlur.standard.rawValue
 
     var body: some View {
         Form {
@@ -119,6 +123,57 @@ struct SettingsView: View {
                     }
                 }
                 Text("检测语言与默认目标语言一致时，改为翻译成候选语言。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("词典") {
+                Picker("备用词典", selection: $model.dictionaryFallbackMode) {
+                    ForEach(DictionaryFallbackMode.allCases) { mode in
+                        Text(mode.title).tag(mode.rawValue)
+                    }
+                }
+                Text("无法可靠识别短文本的语言时，使用系统词典查找释义。具体词典及优先级由“词典”App 管理。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Spacer()
+                    Button("打开“词典”…") {
+                        openDictionaryApp()
+                    }
+                }
+            }
+            Section("窗口") {
+                Picker("弹出位置", selection: $translationWindowPosition) {
+                    ForEach(TranslationWindowPosition.allCases) { position in
+                        Text(position.title).tag(position.rawValue)
+                    }
+                }
+                Text("窗口显示在鼠标当前所在的屏幕上。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("外观") {
+                Picker("外观", selection: $translationAppearanceMode) {
+                    ForEach(TranslationAppearanceMode.allCases) { appearance in
+                        Text(appearance.title).tag(appearance.rawValue)
+                    }
+                }
+                Picker("背景模糊", selection: $translationBackgroundBlur) {
+                    ForEach(TranslationBackgroundBlur.allCases) { blur in
+                        Text(blur.title).tag(blur.rawValue)
+                    }
+                }
+                LabeledContent("背景不透明度") {
+                    HStack(spacing: 10) {
+                        Slider(value: $translationBackgroundOpacity, in: 0.35...1, step: 0.05)
+                            .frame(width: 180)
+                        Text("\(Int((translationBackgroundOpacity * 100).rounded()))%")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 34, alignment: .trailing)
+                    }
+                }
+                Text("外观设置会立即应用到翻译窗口。透明度只影响背景，不影响文字。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -185,6 +240,14 @@ struct SettingsView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+            Section("支持") {
+                Link(destination: URL(string: "https://buymeacoffee.com/chensiyue98")!) {
+                    Label("请我喝杯咖啡", systemImage: "cup.and.saucer")
+                }
+                Text("如果 QoQ 对你有帮助，可以支持它继续改进。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .navigationTitle("QoQ 设置")
@@ -224,5 +287,17 @@ struct SettingsView: View {
         case .downloading: "正在等待 macOS 下载并准备语言资源。"
         case .failed(let message): message
         }
+    }
+
+    private func openDictionaryApp() {
+        let candidates = [
+            "/System/Applications/Dictionary.app",
+            "/Applications/Dictionary.app"
+        ]
+        guard let path = candidates.first(where: FileManager.default.fileExists(atPath:)) else { return }
+        NSWorkspace.shared.openApplication(
+            at: URL(fileURLWithPath: path),
+            configuration: NSWorkspace.OpenConfiguration()
+        )
     }
 }

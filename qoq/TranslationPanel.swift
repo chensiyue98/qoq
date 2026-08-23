@@ -3,9 +3,260 @@ import Combine
 import SwiftUI
 import Translation
 
+enum TranslationWindowPosition: String, CaseIterable, Identifiable {
+    case screenCenter
+    case nearPointer
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .screenCenter: "屏幕中央"
+        case .nearPointer: "鼠标附近"
+        }
+    }
+}
+
+enum TranslationAppearanceMode: String, CaseIterable, Identifiable {
+    case automatic
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic: "跟随系统"
+        case .light: "浅色"
+        case .dark: "深色"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .automatic: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+}
+
+enum TranslationBackgroundBlur: String, CaseIterable, Identifiable {
+    case disabled
+    case subtle
+    case standard
+    case strong
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .disabled: "关闭"
+        case .subtle: "轻微"
+        case .standard: "标准"
+        case .strong: "强"
+        }
+    }
+}
+
+enum TranslationBackgroundStyle {
+    nonisolated static func opacity(for requestedOpacity: Double) -> Double {
+        min(max(requestedOpacity, 0.35), 1)
+    }
+
+    static func configure(
+        _ view: NSVisualEffectView,
+        blur: TranslationBackgroundBlur,
+        opacity: Double
+    ) {
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.alphaValue = Self.opacity(for: opacity)
+        view.isHidden = blur == .disabled
+        switch blur {
+        case .disabled, .subtle:
+            view.material = .underWindowBackground
+        case .standard:
+            view.material = .sidebar
+        case .strong:
+            view.material = .hudWindow
+        }
+    }
+}
+
+enum TranslationWindowPositioner {
+    nonisolated static func origin(
+        for position: TranslationWindowPosition,
+        visibleFrame: NSRect,
+        windowSize: NSSize,
+        pointer: NSPoint
+    ) -> NSPoint {
+        switch position {
+        case .screenCenter:
+            NSPoint(
+                x: visibleFrame.midX - windowSize.width / 2,
+                y: visibleFrame.midY - windowSize.height / 2
+            )
+        case .nearPointer:
+            NSPoint(
+                x: min(max(pointer.x - windowSize.width / 2, visibleFrame.minX), visibleFrame.maxX - windowSize.width),
+                y: min(max(pointer.y - windowSize.height - 20, visibleFrame.minY), visibleFrame.maxY - windowSize.height)
+            )
+        }
+    }
+}
+
+@MainActor
+final class TranslationPanelContainerView: NSView {
+    let effectView = NSVisualEffectView()
+    private let tintView = NSView()
+    private let hostingView: NSHostingView<TranslationPanelView>
+    private var defaultsObserver: NSObjectProtocol?
+
+    init(rootView: TranslationPanelView) {
+        hostingView = NSHostingView(rootView: rootView)
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        tintView.wantsLayer = true
+
+        for view in [effectView, tintView, hostingView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(view)
+            NSLayoutConstraint.activate([
+                view.leadingAnchor.constraint(equalTo: leadingAnchor),
+                view.trailingAnchor.constraint(equalTo: trailingAnchor),
+                view.topAnchor.constraint(equalTo: topAnchor),
+                view.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        }
+
+        applyAppearanceSettings()
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: UserDefaults.standard,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.applyAppearanceSettings()
+            }
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    deinit {
+        if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        applyAppearanceSettings()
+    }
+
+    private func applyAppearanceSettings() {
+        let defaults = UserDefaults.standard
+        let blur = defaults.string(forKey: "translationBackgroundBlur")
+            .flatMap(TranslationBackgroundBlur.init(rawValue:)) ?? .standard
+        let storedOpacity = defaults.object(forKey: "translationBackgroundOpacity") as? Double
+        let opacity = TranslationBackgroundStyle.opacity(for: storedOpacity ?? 0.82)
+        TranslationBackgroundStyle.configure(effectView, blur: blur, opacity: opacity)
+
+        tintView.alphaValue = blur == .disabled ? opacity : 0.12 * opacity
+        tintView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+
+        let appearance = defaults.string(forKey: "translationAppearanceMode")
+            .flatMap(TranslationAppearanceMode.init(rawValue:)) ?? .automatic
+        switch appearance {
+        case .automatic: window?.appearance = nil
+        case .light: window?.appearance = NSAppearance(named: .aqua)
+        case .dark: window?.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 @MainActor
 final class TranslationPanelState: ObservableObject {
     @Published var isPinned = false
+}
+
+fileprivate struct TranslationHoverButtonStyle: ButtonStyle {
+    let compact: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, compact ? 0 : 9)
+            .padding(.vertical, compact ? 0 : 5)
+            .frame(minWidth: compact ? 28 : nil, minHeight: 28)
+            .background(
+                ZStack {
+                    TranslationHoverBackground()
+                    Color.primary.opacity(configuration.isPressed ? 0.13 : 0)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
+private struct TranslationHoverBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> TranslationHoverTrackingView {
+        TranslationHoverTrackingView()
+    }
+
+    func updateNSView(_ view: TranslationHoverTrackingView, context: Context) {
+        view.refreshColor()
+    }
+}
+
+private final class TranslationHoverTrackingView: NSView {
+    private var hoverTrackingArea: NSTrackingArea?
+    private var isHovered = false
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 7
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func updateTrackingAreas() {
+        if let hoverTrackingArea { removeTrackingArea(hoverTrackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        hoverTrackingArea = area
+        super.updateTrackingAreas()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        refreshColor()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        refreshColor()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColor()
+    }
+
+    func refreshColor() {
+        layer?.backgroundColor = isHovered
+            ? NSColor.labelColor.withAlphaComponent(0.09).cgColor
+            : NSColor.clear.cgColor
+    }
 }
 
 @MainActor
@@ -23,13 +274,17 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
         )
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
         panel.minSize = NSSize(width: 420, height: 310)
-        panel.contentView = NSHostingView(rootView: TranslationPanelView(model: model, state: state))
+        panel.contentView = TranslationPanelContainerView(
+            rootView: TranslationPanelView(model: model, state: state)
+        )
         super.init(window: panel)
         panel.delegate = self
     }
@@ -42,12 +297,12 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
     }
 
     func show(text: String, source: TranslationSource) {
-        showWindowNearPointer()
+        showTranslationWindow()
         model.requestTranslation(text, source: source)
     }
 
     func showLoading(source: TranslationSource) {
-        showWindowNearPointer()
+        showTranslationWindow()
         model.source = source
         model.sourceText = "正在识别屏幕文字…"
         model.translatedText = ""
@@ -56,18 +311,22 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
     }
 
     func show(error: String) {
-        showWindowNearPointer()
+        showTranslationWindow()
         model.showError(error)
     }
 
-    private func showWindowNearPointer() {
+    private func showTranslationWindow() {
         guard let window else { return }
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main
         if let visible = screen?.visibleFrame {
-            let origin = NSPoint(
-                x: min(max(mouse.x - window.frame.width / 2, visible.minX), visible.maxX - window.frame.width),
-                y: min(max(mouse.y - window.frame.height - 20, visible.minY), visible.maxY - window.frame.height)
+            let storedPosition = UserDefaults.standard.string(forKey: "translationWindowPosition")
+            let position = storedPosition.flatMap(TranslationWindowPosition.init(rawValue:)) ?? .screenCenter
+            let origin = TranslationWindowPositioner.origin(
+                for: position,
+                visibleFrame: visible,
+                windowSize: window.frame.size,
+                pointer: mouse
             )
             window.setFrameOrigin(origin)
         }
@@ -80,6 +339,7 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
 struct TranslationPanelView: View {
     @ObservedObject var model: TranslationModel
     @ObservedObject var state: TranslationPanelState
+    @AppStorage("translationAppearanceMode") private var appearanceMode = TranslationAppearanceMode.automatic.rawValue
 
     var body: some View {
         VStack(spacing: 0) {
@@ -89,10 +349,14 @@ struct TranslationPanelView: View {
             Divider().opacity(0.65)
             footer
         }
-        .background(.regularMaterial)
+        .preferredColorScheme(resolvedAppearance.colorScheme)
         .translationTask(model.configuration) { session in
             await model.perform(using: session)
         }
+    }
+
+    private var resolvedAppearance: TranslationAppearanceMode {
+        TranslationAppearanceMode(rawValue: appearanceMode) ?? .automatic
     }
 
     private var header: some View {
@@ -109,7 +373,7 @@ struct TranslationPanelView: View {
                     .foregroundStyle(state.isPinned ? Color.accentColor : Color.secondary)
                     .frame(width: 20, height: 20)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(TranslationHoverButtonStyle(compact: true))
             .help(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
             .accessibilityLabel(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
             Menu(model.sourceName) {
@@ -158,7 +422,11 @@ struct TranslationPanelView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             } else {
-                textSection(title: model.targetName, text: model.translatedText, muted: false)
+                if model.outputKind == .dictionaryDefinition {
+                    dictionarySection
+                } else {
+                    textSection(title: model.outputTitle, text: model.translatedText, muted: false)
+                }
             }
         }
         .padding(18)
@@ -170,13 +438,25 @@ struct TranslationPanelView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
-            TextEditor(text: $model.sourceText)
-                .font(.system(size: 15))
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, -5)
-                .accessibilityLabel("原文")
+            ZStack(alignment: .bottomTrailing) {
+                TextEditor(text: $model.sourceText)
+                    .font(.system(size: 15))
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, -5)
+                    .accessibilityLabel("原文")
+                copyIconButton(
+                    action: model.copySourceText,
+                    label: "复制原文",
+                    disabled: model.sourceText.isEmpty
+                )
+                .padding(4)
+            }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(
+            minHeight: model.outputKind == .dictionaryDefinition ? 64 : nil,
+            maxHeight: model.outputKind == .dictionaryDefinition ? 110 : .infinity,
+            alignment: .top
+        )
     }
 
     private var sourceLanguagePrompt: some View {
@@ -210,15 +490,108 @@ struct TranslationPanelView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
-            ScrollView {
-                Text(text)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    Text(text)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, 32)
+                        .padding(.bottom, 32)
+                }
+                copyIconButton(
+                    action: model.copyTranslation,
+                    label: "复制译文",
+                    disabled: text.isEmpty
+                )
+                .padding(4)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private var dictionarySection: some View {
+        let layout = DictionaryDefinitionParser.parse(model.translatedText, term: model.sourceText)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("词典释义")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.8)
+                .foregroundStyle(.secondary)
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if let metadata = layout.metadata {
+                            Text(metadata)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .lineSpacing(3)
+                                .textSelection(.enabled)
+                        }
+                        ForEach(layout.senses) { sense in
+                            HStack(alignment: .top, spacing: 10) {
+                                if let number = sense.number {
+                                    Text(number)
+                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(Color.accentColor)
+                                        .frame(width: 22, height: 22)
+                                        .background(Color.accentColor.opacity(0.1), in: Circle())
+                                }
+                                dictionarySense(sense.definition)
+                            }
+                        }
+                    }
+                    .padding(.trailing, 32)
+                    .padding(.bottom, 32)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                copyIconButton(
+                    action: model.copyTranslation,
+                    label: "复制释义",
+                    disabled: model.translatedText.isEmpty
+                )
+                .padding(4)
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func dictionarySense(_ text: String) -> some View {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        return VStack(alignment: .leading, spacing: 7) {
+            if let definition = lines.first {
+                Text(definition)
+                    .font(.system(size: 15))
+                    .lineSpacing(4)
+                    .textSelection(.enabled)
+            }
+            ForEach(Array(lines.dropFirst().enumerated()), id: \.offset) { _, line in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "arrow.turn.down.right")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                    Text(line.replacingOccurrences(of: #"^•\s*"#, with: "", options: .regularExpression))
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(3)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func copyIconButton(action: @escaping () -> Void, label: String, disabled: Bool) -> some View {
+        Button(action: action) {
+            Image(systemName: "doc.on.doc")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(TranslationHoverButtonStyle(compact: true))
+        .disabled(disabled)
+        .help(label)
+        .accessibilityLabel(label)
     }
 
     private var footer: some View {
@@ -230,13 +603,9 @@ struct TranslationPanelView: View {
             Button { model.translateEditedText() } label: {
                 Label("重新翻译", systemImage: "arrow.clockwise")
             }
+            .buttonStyle(TranslationHoverButtonStyle(compact: false))
             .disabled(model.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isWorking)
             .keyboardShortcut(.return, modifiers: [.command])
-            Button { model.copyTranslation() } label: {
-                Label("复制译文", systemImage: "doc.on.doc")
-            }
-            .disabled(model.translatedText.isEmpty)
-            .buttonStyle(.borderless)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
