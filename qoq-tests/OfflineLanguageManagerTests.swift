@@ -3,7 +3,10 @@ import XCTest
 @testable import QoQ
 
 final class OfflineLanguageManagerTests: XCTestCase {
+    @MainActor
+    @available(macOS 26.4, *)
     func testUsesLowLatencyLanguageModelStrategy() {
-        XCTAssertEqual(OfflineLanguageManager.strategy, .lowLatency)
+        let strategy = OfflineLanguageManager.strategy
+        XCTAssertEqual(strategy, .lowLatency)
     }
 }
