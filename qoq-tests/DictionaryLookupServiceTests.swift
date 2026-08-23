@@ -19,7 +19,7 @@ final class DictionaryLookupServiceTests: XCTestCase {
 
         XCTAssertTrue(model.useDictionaryFallbackIfAvailable(for: "serendipity"))
         XCTAssertEqual(model.translatedText, "意外发现美好事物的能力或运气")
-        XCTAssertEqual(model.outputTitle, "词典释义")
+        XCTAssertEqual(model.outputTitle, L("词典释义"))
     }
 
     func testDisabledFallbackDoesNotQueryDictionary() {
