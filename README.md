@@ -1,23 +1,25 @@
 # QoQ
 
-一款仅使用 macOS 系统能力的原生翻译菜单栏应用。
+[简体中文](README.zh-CN.md) | **English**
 
-## 功能
+A native macOS menu bar translation app built entirely on system frameworks.
 
-- `⌘ ⇧ D`：读取当前应用中选中的文字并翻译
-- `⌘ ⇧ 2`：框选屏幕区域，使用 Vision OCR 识别后翻译
-- `⌘ ⇧ 1`：框选屏幕区域，仅使用 Vision OCR 提取文字并复制到剪贴板
-- 可在设置中录制并保存两项自定义全局快捷键
-- 使用 macOS Translation framework，不依赖第三方翻译服务
-- 原生 SwiftUI 浮层、菜单栏入口、自动语言检测与译文复制
-- 界面跟随 macOS 语言，支持简体中文、繁體中文、English、日本語和한국어
-- 翻译语言名称使用系统本地化显示，内置 19 种常用翻译语言
+## Features
 
-## 要求
+- `⌘ ⇧ D`: Read and translate text selected in the current app
+- `⌘ ⇧ 2`: Select a screen region, recognize its text with Vision OCR, and translate it
+- `⌘ ⇧ 1`: Select a screen region, extract its text with Vision OCR, and copy it to the clipboard without translating
+- Record and save all three custom global shortcuts in Settings
+- Translate with the macOS Translation framework—no third-party translation service required
+- Native SwiftUI overlay, menu bar controls, automatic language detection, and translation copying
+- Localized interface in Simplified Chinese, Traditional Chinese, English, Japanese, and Korean
+- System-localized language names and 19 commonly used translation languages
+
+## Requirements
 
 - macOS 26.0+
 - Xcode 26.0+
-- 首次划词翻译需授予“辅助功能”权限
-- 首次框选翻译需授予“屏幕与系统音频录制”权限
+- Accessibility permission for translating selected text
+- Screen & System Audio Recording permission for screen-region OCR
 
-打开 `qoq.xcodeproj` 后直接运行。首次翻译某个语言组合时，系统可能提示下载对应语言包。
+Open `qoq.xcodeproj` in Xcode and run the app. macOS may ask to download the required language resources the first time you translate a language pair.
