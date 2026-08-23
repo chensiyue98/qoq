@@ -47,8 +47,8 @@ final class UpdateChecker: ObservableObject {
 
         var errorDescription: String? {
             switch self {
-            case .invalidResponse: "GitHub 返回了无法识别的响应。"
-            case .noPublishedRelease: "项目尚未发布可供下载的版本。"
+            case .invalidResponse: L("GitHub 返回了无法识别的响应。")
+            case .noPublishedRelease: L("项目尚未发布可供下载的版本。")
             }
         }
     }
@@ -166,13 +166,13 @@ final class OfflineLanguageManager: ObservableObject {
 
         var title: String {
             switch self {
-            case .checking: "正在检查"
-            case .installed: "已下载"
-            case .available: "可下载"
-            case .unsupported: "不支持"
-            case .notNeeded: "无需下载"
-            case .downloading: "正在下载"
-            case .failed: "下载失败"
+            case .checking: L("正在检查")
+            case .installed: L("已下载")
+            case .available: L("可下载")
+            case .unsupported: L("不支持")
+            case .notNeeded: L("无需下载")
+            case .downloading: L("正在下载")
+            case .failed: L("下载失败")
             }
         }
 
@@ -257,6 +257,7 @@ struct SettingsView: View {
     @StateObject private var permissions = PermissionStatusManager()
     @AppStorage("translationWindowPosition") private var translationWindowPosition = TranslationWindowPosition.screenCenter.rawValue
     @AppStorage("translationAppearanceMode") private var translationAppearanceMode = TranslationAppearanceMode.automatic.rawValue
+    @AppStorage(AppLanguage.defaultsKey) private var appLanguage = AppLanguage.system.rawValue
     @AppStorage("translationBackgroundOpacity") private var translationBackgroundOpacity = 0.82
     @AppStorage("translationBackgroundBlur") private var translationBackgroundBlur = TranslationBackgroundBlur.standard.rawValue
     @AppStorage(TranslationBehaviorKey.showInputField) private var showInputField = true
@@ -271,21 +272,27 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             generalSettings
-                .tabItem { Label("通用", systemImage: "gearshape") }
+                .tabItem { Label(L("settings.tab.general"), systemImage: "gearshape") }
             translationSettings
-                .tabItem { Label("翻译", systemImage: "character.bubble") }
+                .tabItem { Label(L("settings.tab.translation"), systemImage: "character.bubble") }
             offlineLanguageSettings
-                .tabItem { Label("离线语言", systemImage: "arrow.down.circle") }
+                .tabItem { Label(L("settings.tab.offline"), systemImage: "arrow.down.circle") }
             shortcutSettings
-                .tabItem { Label("快捷键", systemImage: "keyboard") }
+                .tabItem { Label(L("settings.tab.shortcuts"), systemImage: "keyboard") }
             aboutSettings
-                .tabItem { Label("关于", systemImage: "info.circle") }
+                .tabItem { Label(L("settings.tab.about"), systemImage: "info.circle") }
         }
         .padding(.top, 8)
+        .environment(\.locale, resolvedAppLanguage.locale)
+        // Rebuild controls whose AppKit-backed menus cache plain String labels.
+        .id(appLanguage)
         .onAppear {
             launchAtLogin.refresh()
             permissions.refresh()
+            updateSettingsWindowPresentation()
         }
+        .onChange(of: appLanguage) { _, _ in updateSettingsWindowPresentation() }
+        .onChange(of: translationAppearanceMode) { _, _ in updateSettingsWindowPresentation() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             permissions.refresh()
         }
@@ -306,6 +313,16 @@ struct SettingsView: View {
 
     private var generalSettings: some View {
         Form {
+            Section("语言") {
+                Picker("App 语言", selection: $appLanguage) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.title).tag(language.rawValue)
+                    }
+                }
+                Text("更改后立即应用；跟随系统时使用 macOS 的首选语言。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("启动") {
                 Toggle(
                     "开机启动",
@@ -357,6 +374,24 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var resolvedAppLanguage: AppLanguage {
+        AppLanguage(rawValue: appLanguage) ?? .system
+    }
+
+    private var resolvedAppearance: TranslationAppearanceMode {
+        TranslationAppearanceMode(rawValue: translationAppearanceMode) ?? .automatic
+    }
+
+    private func updateSettingsWindowPresentation() {
+        guard let window = NSApp.keyWindow else { return }
+        window.title = L("QoQ 设置")
+        switch resolvedAppearance {
+        case .automatic: window.appearance = nil
+        case .light: window.appearance = NSAppearance(named: .aqua)
+        case .dark: window.appearance = NSAppearance(named: .darkAqua)
+        }
     }
 
     private var translationSettings: some View {
@@ -458,6 +493,9 @@ struct SettingsView: View {
                 LabeledContent("框选屏幕翻译") {
                     ShortcutRecorder(shortcut: shortcuts.capture, onChange: shortcuts.setCapture)
                 }
+                LabeledContent("提取屏幕文字") {
+                    ShortcutRecorder(shortcut: shortcuts.extractText, onChange: shortcuts.setExtractText)
+                }
                 HStack {
                     if let error = shortcuts.errorMessage {
                         Text(error)
@@ -475,13 +513,13 @@ struct SettingsView: View {
             }
             Section("权限") {
                 permissionRow(
-                    title: "辅助功能",
-                    description: "读取其他应用中选中的文字",
+                    title: L("辅助功能"),
+                    description: L("读取其他应用中选中的文字"),
                     granted: permissions.accessibilityGranted
                 )
                 permissionRow(
-                    title: "屏幕录制",
-                    description: "截取框选区域并识别文字",
+                    title: L("屏幕录制"),
+                    description: L("截取框选区域并识别文字"),
                     granted: permissions.screenRecordingGranted
                 )
             }
@@ -538,7 +576,7 @@ struct SettingsView: View {
     @ViewBuilder private var updateStatusView: some View {
         switch updateChecker.status {
         case .idle:
-            Text("当前\(versionText)")
+            Text(L("当前%@", versionText))
                 .foregroundStyle(.secondary)
         case .checking:
             HStack(spacing: 8) {
@@ -547,11 +585,11 @@ struct SettingsView: View {
             }
             .foregroundStyle(.secondary)
         case .upToDate(let version):
-            Label("已是最新版本（\(version)）", systemImage: "checkmark.circle.fill")
+            Label(L("已是最新版本（%@）", version), systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case .updateAvailable(let version, let url):
             Link(destination: url) {
-                Label("发现新版本 \(version)", systemImage: "arrow.down.circle.fill")
+                Label(L("发现新版本 %@", version), systemImage: "arrow.down.circle.fill")
             }
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -579,7 +617,7 @@ struct SettingsView: View {
             }
             Spacer()
             Label(
-                granted ? "已授权" : "未授权",
+                granted ? L("已授权") : L("未授权"),
                 systemImage: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
             )
             .foregroundStyle(granted ? Color.green : Color.orange)
@@ -590,8 +628,8 @@ struct SettingsView: View {
     private var versionText: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
-        if version.isEmpty { return build.isEmpty ? "" : "构建版本 \(build)" }
-        return build.isEmpty ? "版本 \(version)" : "版本 \(version)（\(build)）"
+        if version.isEmpty { return build.isEmpty ? "" : L("构建版本 %@", build) }
+        return build.isEmpty ? L("版本 %@", version) : L("版本 %@（%@）", version, build)
     }
 
     private var statusColor: Color {
@@ -604,25 +642,25 @@ struct SettingsView: View {
 
     private var launchAtLoginDescription: String {
         if let error = launchAtLogin.errorMessage {
-            return "无法更改开机启动：\(error)"
+            return L("无法更改开机启动：%@", error)
         }
         if launchAtLogin.requiresApproval {
-            return "需要在“系统设置 → 通用 → 登录项”中允许 QoQ。"
+            return L("需要在“系统设置 → 通用 → 登录项”中允许 QoQ。")
         }
-        return "登录 macOS 后自动启动 QoQ。"
+        return L("登录 macOS 后自动启动 QoQ。")
     }
 
     private var statusDescription: String {
         switch offlineLanguages.status {
-        case .checking: "正在读取系统语言资源状态。"
-        case .installed: "这个语言对已下载，可离线使用。"
-        case .available: "语言资源尚未下载；macOS 会显示下载确认窗口。"
-        case .unsupported: "系统 Translation framework 不支持这个语言对。"
+        case .checking: L("正在读取系统语言资源状态。")
+        case .installed: L("这个语言对已下载，可离线使用。")
+        case .available: L("语言资源尚未下载；macOS 会显示下载确认窗口。")
+        case .unsupported: L("系统 Translation framework 不支持这个语言对。")
         case .notNeeded:
             offlineLanguages.sourceLanguage == offlineLanguages.targetLanguage
-                ? "原文和译文语言相同。"
-                : "繁简转换使用系统内置资源，无需下载。"
-        case .downloading: "正在等待 macOS 下载并准备语言资源。"
+                ? L("原文和译文语言相同。")
+                : L("繁简转换使用系统内置资源，无需下载。")
+        case .downloading: L("正在等待 macOS 下载并准备语言资源。")
         case .failed(let message): message
         }
     }

@@ -3,15 +3,14 @@ import SwiftUI
 @main
 struct QoQApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @AppStorage(AppLanguage.defaultsKey) private var appLanguage = AppLanguage.system.rawValue
 
     var body: some Scene {
         MenuBarExtra("QoQ", systemImage: "character.bubble") {
-            Button("翻译所选文字") {
-                appDelegate.translateSelection()
-            }
-            Button("框选屏幕翻译") {
-                appDelegate.captureScreen()
-            }
+            Group {
+                Button("翻译所选文字") { appDelegate.translateSelection() }
+                Button("框选屏幕翻译") { appDelegate.captureScreen() }
+                Button("提取屏幕文字") { appDelegate.extractScreenText() }
 
             Divider()
 
@@ -24,10 +23,10 @@ struct QoQApp: App {
 
             Divider()
 
-            Button("退出 QoQ") {
-                NSApp.terminate(nil)
+                Button("退出 QoQ") { NSApp.terminate(nil) }
+                    .keyboardShortcut("q")
             }
-            .keyboardShortcut("q")
+            .environment(\.locale, (AppLanguage(rawValue: appLanguage) ?? .system).locale)
         }
         .menuBarExtraStyle(.menu)
     }

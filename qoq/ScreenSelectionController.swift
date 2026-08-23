@@ -116,7 +116,7 @@ private final class SelectionOverlayView: NSView {
                 .foregroundColor: NSColor.white
             ])
         } else {
-            let message = "拖动以选择文字区域  ·  Esc 取消"
+            let message = L("拖动以选择文字区域  ·  Esc 取消")
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 14, weight: .medium),
                 .foregroundColor: NSColor.white

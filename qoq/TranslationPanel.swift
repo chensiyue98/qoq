@@ -20,8 +20,8 @@ enum TranslationWindowPosition: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .screenCenter: "屏幕中央"
-        case .nearPointer: "鼠标附近"
+        case .screenCenter: L("屏幕中央")
+        case .nearPointer: L("鼠标附近")
         }
     }
 }
@@ -35,9 +35,9 @@ enum TranslationAppearanceMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .automatic: "跟随系统"
-        case .light: "浅色"
-        case .dark: "深色"
+        case .automatic: L("跟随系统")
+        case .light: L("浅色")
+        case .dark: L("深色")
         }
     }
 
@@ -60,10 +60,10 @@ enum TranslationBackgroundBlur: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .disabled: "关闭"
-        case .subtle: "轻微"
-        case .standard: "标准"
-        case .strong: "强"
+        case .disabled: L("关闭")
+        case .subtle: L("轻微")
+        case .standard: L("标准")
+        case .strong: L("强")
         }
     }
 }
@@ -202,8 +202,8 @@ private struct TranslationPinButton: View {
                 .frame(width: 20, height: 20)
         }
         .buttonStyle(TranslationHoverButtonStyle(compact: true))
-        .help(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
-        .accessibilityLabel(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
+        .help(state.isPinned ? L("取消固定窗口") : L("固定窗口置顶"))
+        .accessibilityLabel(state.isPinned ? L("取消固定窗口") : L("固定窗口置顶"))
     }
 }
 
@@ -218,6 +218,7 @@ private struct TranslationTitlebarControls: View {
     @AppStorage(TranslationBehaviorKey.copyOCRResult) private var copyOCRResult = false
     @AppStorage(TranslationBehaviorKey.copyFirstTranslation) private var copyFirstTranslation = false
     @AppStorage(TranslationBehaviorKey.speakSourceText) private var speakSourceText = false
+    @AppStorage(AppLanguage.defaultsKey) private var appLanguage = AppLanguage.system.rawValue
 
     var body: some View {
         HStack(spacing: 4) {
@@ -259,6 +260,7 @@ private struct TranslationTitlebarControls: View {
             .help("更多操作")
             .accessibilityLabel("更多操作")
         }
+        .environment(\.locale, (AppLanguage(rawValue: appLanguage) ?? .system).locale)
     }
 }
 
@@ -443,7 +445,7 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
     func showLoading(source: TranslationSource) {
         showTranslationWindow()
         model.source = source
-        model.sourceText = "正在识别屏幕文字…"
+        model.sourceText = L("正在识别屏幕文字…")
         model.translatedText = ""
         model.errorMessage = nil
         model.isWorking = true
@@ -479,6 +481,7 @@ struct TranslationPanelView: View {
     @ObservedObject var model: TranslationModel
     @ObservedObject var state: TranslationPanelState
     @AppStorage("translationAppearanceMode") private var appearanceMode = TranslationAppearanceMode.automatic.rawValue
+    @AppStorage(AppLanguage.defaultsKey) private var appLanguage = AppLanguage.system.rawValue
     @AppStorage(TranslationBehaviorKey.showInputField) private var showInputField = true
     @AppStorage(TranslationBehaviorKey.showLanguageBar) private var showLanguageBar = true
 
@@ -491,6 +494,7 @@ struct TranslationPanelView: View {
             footer
         }
         .preferredColorScheme(resolvedAppearance.colorScheme)
+        .environment(\.locale, (AppLanguage(rawValue: appLanguage) ?? .system).locale)
         .translationTask(model.configuration) { session in
             await model.perform(using: session)
         }
@@ -553,7 +557,7 @@ struct TranslationPanelView: View {
             } else if model.isWorking {
                 HStack(spacing: 9) {
                     ProgressView().controlSize(.small)
-                    Text(model.source == .screen && model.sourceText.hasPrefix("正在识别") ? "识别中" : "翻译中")
+                    Text(model.source == .screen && model.sourceText == L("正在识别屏幕文字…") ? L("识别中") : L("翻译中"))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -582,7 +586,7 @@ struct TranslationPanelView: View {
                     .accessibilityLabel("原文")
                 copyIconButton(
                     action: model.copySourceText,
-                    label: "复制原文",
+                    label: L("复制原文"),
                     disabled: model.sourceText.isEmpty
                 )
                 .padding(4)
@@ -638,7 +642,7 @@ struct TranslationPanelView: View {
                 }
                 copyIconButton(
                     action: model.copyTranslation,
-                    label: "复制译文",
+                    label: L("复制译文"),
                     disabled: text.isEmpty
                 )
                 .padding(4)
@@ -683,7 +687,7 @@ struct TranslationPanelView: View {
                 }
                 copyIconButton(
                     action: model.copyTranslation,
-                    label: "复制释义",
+                    label: L("复制释义"),
                     disabled: model.translatedText.isEmpty
                 )
                 .padding(4)

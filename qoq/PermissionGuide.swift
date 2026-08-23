@@ -16,7 +16,7 @@ final class PermissionGuideController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "欢迎使用 QoQ"
+        window.title = L("欢迎使用 QoQ")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
@@ -39,6 +39,7 @@ final class PermissionGuideController: NSWindowController, NSWindowDelegate {
 private struct PermissionGuideView: View {
     @ObservedObject var status: PermissionStatusModel
     let close: () -> Void
+    @AppStorage(AppLanguage.defaultsKey) private var appLanguage = AppLanguage.system.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -60,8 +61,8 @@ private struct PermissionGuideView: View {
 
             permissionRow(
                 icon: "text.cursor",
-                title: "辅助功能",
-                explanation: "读取当前应用中已经选中的文字，用于快捷键划词翻译。",
+                title: L("辅助功能"),
+                explanation: L("读取当前应用中已经选中的文字，用于快捷键划词翻译。"),
                 granted: status.accessibilityGranted,
                 action: requestAccessibility
             )
@@ -70,8 +71,8 @@ private struct PermissionGuideView: View {
 
             permissionRow(
                 icon: "rectangle.dashed",
-                title: "屏幕录制",
-                explanation: "仅截取你拖动框选的区域，使用系统 Vision 在本机识别文字。",
+                title: L("屏幕录制"),
+                explanation: L("仅截取你拖动框选的区域，使用系统 Vision 在本机识别文字。"),
                 granted: status.screenCaptureGranted,
                 action: requestScreenCapture
             )
@@ -89,6 +90,7 @@ private struct PermissionGuideView: View {
         }
         .padding(22)
         .background(.regularMaterial)
+        .environment(\.locale, (AppLanguage(rawValue: appLanguage) ?? .system).locale)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             status.refresh()
         }
@@ -122,7 +124,7 @@ private struct PermissionGuideView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
-            Button(granted ? "已完成" : "允许") { action() }
+            Button(granted ? L("已完成") : L("允许")) { action() }
                 .disabled(granted)
                 .controlSize(.regular)
         }

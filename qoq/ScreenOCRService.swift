@@ -13,8 +13,8 @@ enum ScreenCaptureError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .captureFailed: "无法截取所选屏幕区域。"
-        case .noText: "所选区域中没有识别到文字。"
+        case .captureFailed: L("无法截取所选屏幕区域。")
+        case .noText: L("所选区域中没有识别到文字。")
         }
     }
 }

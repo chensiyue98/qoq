@@ -3,12 +3,13 @@ import Carbon
 import Combine
 import SwiftUI
 
-struct GlobalShortcut: Codable, Equatable {
+struct GlobalShortcut: Codable, Hashable {
     let keyCode: UInt32
     let modifiers: UInt32
 
     static let selectionDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_D), modifiers: UInt32(cmdKey | shiftKey))
     static let captureDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey))
+    static let extractTextDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_1), modifiers: UInt32(cmdKey | shiftKey))
 
     var displayName: String {
         var result = ""
@@ -59,34 +60,39 @@ struct GlobalShortcut: Codable, Equatable {
 final class ShortcutPreferences: ObservableObject {
     @Published private(set) var selection: GlobalShortcut
     @Published private(set) var capture: GlobalShortcut
+    @Published private(set) var extractText: GlobalShortcut
     @Published var errorMessage: String?
-    var onChange: ((GlobalShortcut, GlobalShortcut) -> Bool)?
+    var onChange: ((GlobalShortcut, GlobalShortcut, GlobalShortcut) -> Bool)?
 
     init() {
         selection = Self.load("selectionShortcut") ?? .selectionDefault
         capture = Self.load("captureShortcut") ?? .captureDefault
+        extractText = Self.load("extractTextShortcut") ?? .extractTextDefault
     }
 
-    func setSelection(_ shortcut: GlobalShortcut) { apply(selection: shortcut, capture: capture) }
-    func setCapture(_ shortcut: GlobalShortcut) { apply(selection: selection, capture: shortcut) }
-    func reset() { apply(selection: .selectionDefault, capture: .captureDefault) }
+    func setSelection(_ shortcut: GlobalShortcut) { apply(selection: shortcut, capture: capture, extractText: extractText) }
+    func setCapture(_ shortcut: GlobalShortcut) { apply(selection: selection, capture: shortcut, extractText: extractText) }
+    func setExtractText(_ shortcut: GlobalShortcut) { apply(selection: selection, capture: capture, extractText: shortcut) }
+    func reset() { apply(selection: .selectionDefault, capture: .captureDefault, extractText: .extractTextDefault) }
 
-    private func apply(selection newSelection: GlobalShortcut, capture newCapture: GlobalShortcut) {
-        guard newSelection != newCapture else {
-            errorMessage = "两个功能不能使用相同的快捷键。"
+    private func apply(selection newSelection: GlobalShortcut, capture newCapture: GlobalShortcut, extractText newExtractText: GlobalShortcut) {
+        guard Set([newSelection, newCapture, newExtractText]).count == 3 else {
+            errorMessage = L("三个功能不能使用相同的快捷键。")
             NSSound.beep()
             return
         }
-        guard onChange?(newSelection, newCapture) ?? true else {
-            errorMessage = "快捷键已被系统或其他应用占用，请换一个组合。"
+        guard onChange?(newSelection, newCapture, newExtractText) ?? true else {
+            errorMessage = L("快捷键已被系统或其他应用占用，请换一个组合。")
             NSSound.beep()
             return
         }
         selection = newSelection
         capture = newCapture
+        extractText = newExtractText
         errorMessage = nil
         Self.save(newSelection, key: "selectionShortcut")
         Self.save(newCapture, key: "captureShortcut")
+        Self.save(newExtractText, key: "extractTextShortcut")
     }
 
     private static func load(_ key: String) -> GlobalShortcut? {
@@ -161,7 +167,7 @@ final class ShortcutRecorderView: NSView {
         (isRecording ? NSColor.controlAccentColor : NSColor.separatorColor).setStroke()
         shape.lineWidth = isRecording ? 1.5 : 1
         shape.stroke()
-        let text = isRecording ? "请按快捷键…" : shortcut.displayName
+        let text = isRecording ? L("请按快捷键…") : shortcut.displayName
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
             .foregroundColor: isRecording ? NSColor.controlAccentColor : NSColor.labelColor

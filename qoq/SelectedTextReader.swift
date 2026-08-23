@@ -9,9 +9,9 @@ enum SelectedTextError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .permissionDenied:
-            "需要“辅助功能”权限才能读取其他应用中所选的文字。请在系统设置的“隐私与安全性”中允许 QoQ。"
+            L("需要“辅助功能”权限才能读取其他应用中所选的文字。请在系统设置的“隐私与安全性”中允许 QoQ。")
         case .unavailable:
-            "没有读取到所选文字。请先在支持文本选择的应用中选中文字。"
+            L("没有读取到所选文字。请先在支持文本选择的应用中选中文字。")
         }
     }
 }

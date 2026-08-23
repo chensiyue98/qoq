@@ -1,0 +1,8 @@
+/* Chinese source strings are used as localization keys. This file prevents
+   explicit Simplified Chinese selection from falling back to English. */
+"跟随系统" = "跟随系统";
+"settings.tab.general" = "通用";
+"settings.tab.translation" = "翻译";
+"settings.tab.offline" = "离线";
+"settings.tab.shortcuts" = "快捷键";
+"settings.tab.about" = "关于";

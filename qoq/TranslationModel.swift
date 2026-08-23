@@ -11,9 +11,9 @@ enum TranslationSource {
 
     var label: String {
         switch self {
-        case .selection: "所选文字"
-        case .screen: "屏幕识别"
-        case .manual: "输入文字"
+        case .selection: L("所选文字")
+        case .screen: L("屏幕识别")
+        case .manual: L("输入文字")
         }
     }
 }
@@ -71,8 +71,8 @@ enum DictionaryFallbackMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .system: "系统词典"
-        case .disabled: "不使用词典"
+        case .system: L("系统词典")
+        case .disabled: L("不使用词典")
         }
     }
 }
@@ -187,7 +187,16 @@ enum DictionaryDefinitionParser {
 
 struct LanguageChoice: Identifiable, Hashable {
     let id: String
-    let title: String
+    private let fallbackTitle: String
+
+    init(id: String, title: String) {
+        self.id = id
+        self.fallbackTitle = title
+    }
+
+    var title: String {
+        Locale.autoupdatingCurrent.localizedString(forIdentifier: id) ?? fallbackTitle
+    }
 
     static let supported = [
         LanguageChoice(id: "zh-Hans", title: "简体中文"),
@@ -287,12 +296,12 @@ final class TranslationModel: ObservableObject {
     }
 
     var sourceName: String {
-        guard let sourceLanguage else { return "选择语言" }
+        guard let sourceLanguage else { return L("选择语言") }
         return LanguageChoice.supported.first(where: { $0.id == sourceLanguage })?.title ?? sourceLanguage
     }
 
     var outputTitle: String {
-        outputKind == .dictionaryDefinition ? "词典释义" : targetName
+        outputKind == .dictionaryDefinition ? L("词典释义") : targetName
     }
 
     func requestTranslation(_ text: String, source: TranslationSource) {
@@ -304,7 +313,7 @@ final class TranslationModel: ObservableObject {
             removeDashPrefixes: defaults.bool(forKey: TranslationBehaviorKey.removeDashPrefixes)
         )
         guard !clean.isEmpty else {
-            showError("没有找到可翻译的文字。")
+            showError(L("没有找到可翻译的文字。"))
             return
         }
         shouldCopyCurrentResult = defaults.bool(forKey: TranslationBehaviorKey.copyFirstTranslation)
@@ -412,7 +421,7 @@ final class TranslationModel: ObservableObject {
             completeOutput(normalized, kind: .translation)
             isWorking = false
         } catch {
-            showError("翻译失败：\(error.localizedDescription)")
+            showError(L("翻译失败：%@", error.localizedDescription))
         }
     }
 
