@@ -546,16 +546,18 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("更新") {
-                HStack(spacing: 12) {
-                    updateStatusView
-                    Spacer()
-                    Button("检查更新") {
-                        Task { await updateChecker.check() }
+            #if !APP_STORE
+                Section("更新") {
+                    HStack(spacing: 12) {
+                        updateStatusView
+                        Spacer()
+                        Button("检查更新") {
+                            Task { await updateChecker.check() }
+                        }
+                        .disabled(isCheckingForUpdates)
                     }
-                    .disabled(isCheckingForUpdates)
                 }
-            }
+            #endif
             Section("支持") {
                 Link(destination: URL(string: "https://buymeacoffee.com/chensiyue98")!) {
                     Label("请我喝杯咖啡", systemImage: "cup.and.saucer")

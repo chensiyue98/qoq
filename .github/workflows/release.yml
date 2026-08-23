@@ -20,19 +20,223 @@ on:
 permissions:
   contents: write
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
 concurrency:
   group: production-release
   cancel-in-progress: false
 
 jobs:
+  app_store:
+    name: Upload to App Store Connect
+    if: ${{ inputs.prerelease == false }}
+    runs-on: macos-26
+    environment: production
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    env:
+      PROJECT: qoq.xcodeproj
+      SCHEME: QoQ-AppStore
+      TEAM_ID: 4SGGP72YQZ
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release inputs
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
+          if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Invalid build number: $BUILD_NUMBER"
+            exit 1
+          fi
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+            exit 1
+          fi
+
+          if [[ "${GITHUB_REF_NAME}" != "main" ]]; then
+            echo "Releases must be created from main"
+            exit 1
+          fi
+
+      - name: Show build environment
+        run: |
+          sw_vers
+          xcodebuild -version
+
+      - name: Run tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Create temporary keychain
+        shell: bash
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          CERTIFICATE_PATH="$RUNNER_TEMP/apple-distribution.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/qoq-app-store.keychain-db"
+
+          printf '%s' "$CERTIFICATE_BASE64" |
+            base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain \
+            -p "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security set-keychain-settings \
+            -lut 21600 \
+            "$KEYCHAIN_PATH"
+
+          security unlock-keychain \
+            -p "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security import "$CERTIFICATE_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security list-keychains \
+            -d user \
+            -s "$KEYCHAIN_PATH"
+
+          security find-identity \
+            -v \
+            -p codesigning \
+            "$KEYCHAIN_PATH"
+
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Prepare App Store Connect API key
+        shell: bash
+        env:
+          ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          ASC_KEY_PATH="$RUNNER_TEMP/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+
+          printf '%s' "$ASC_PRIVATE_KEY_BASE64" |
+            base64 --decode > "$ASC_KEY_PATH"
+
+          chmod 600 "$ASC_KEY_PATH"
+          echo "ASC_KEY_PATH=$ASC_KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Archive App Store application
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_PATH="$RUNNER_TEMP/QoQ-AppStore.xcarchive"
+
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release-AppStore \
+            -destination "generic/platform=macOS" \
+            -archivePath "$ARCHIVE_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            ENABLE_APP_SANDBOX=YES \
+            ENABLE_HARDENED_RUNTIME=YES \
+            ONLY_ACTIVE_ARCH=NO
+
+          echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload App Store build
+        shell: bash
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$RUNNER_TEMP/AppStoreExport" \
+            -exportOptionsPlist "Config/ExportOptions-AppStore.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload diagnostic artifact on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-store-diagnostics
+          path: |
+            ~/Library/Logs/DiagnosticReports
+            ${{ runner.temp }}/*.xcdistributionlogs
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Delete temporary keychain
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${KEYCHAIN_PATH:-}" && -f "$KEYCHAIN_PATH" ]]; then
+            security delete-keychain "$KEYCHAIN_PATH"
+          fi
+
   release:
     name: Build, notarize and release
+    needs: app_store
+    if: ${{ always() && (inputs.prerelease == true || needs.app_store.result == 'success') }}
     runs-on: macos-26
     environment: production
     timeout-minutes: 60
 
     env:
-      SCHEME: QoQ
+      SCHEME: QoQ-Direct
       PROJECT: qoq.xcodeproj
       TEAM_ID: 4SGGP72YQZ
       TAP_REPOSITORY: chensiyue98/homebrew-tap
@@ -72,9 +276,9 @@ jobs:
             exit 1
           fi
 
-      - name: Select Xcode
+      - name: Show build environment
         run: |
-          sudo xcode-select --switch /Applications/Xcode_26.6.app
+          sw_vers
           xcodebuild -version
 
       - name: Create temporary keychain
