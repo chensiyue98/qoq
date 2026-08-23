@@ -394,8 +394,10 @@ jobs:
           set -euo pipefail
 
           brew untap "$TAP_NAME" >/dev/null 2>&1 || true
+          brew untrust --tap "$TAP_NAME" >/dev/null 2>&1 || true
           brew tap "$TAP_NAME" "$GITHUB_WORKSPACE/homebrew-tap"
-          trap 'brew untap "$TAP_NAME" >/dev/null 2>&1 || true' EXIT
+          trap 'brew untrust --tap "$TAP_NAME" >/dev/null 2>&1 || true; brew untap "$TAP_NAME" >/dev/null 2>&1 || true' EXIT
+          brew trust --tap "$TAP_NAME"
 
           brew audit --cask --strict qoq
 
