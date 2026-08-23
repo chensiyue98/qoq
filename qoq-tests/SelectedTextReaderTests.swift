@@ -1,8 +1,8 @@
-import Foundation
+import XCTest
+@testable import QoQ
 
-@main
-enum SelectedTextReaderTests {
-    static func main() {
+final class SelectedTextReaderTests: XCTestCase {
+    func testWaitsForDelayedPasteboardText() {
         var poll = 0
         let text = SelectedTextReader.waitForCopiedText(
             clearedChangeCount: 10,
@@ -15,10 +15,6 @@ enum SelectedTextReaderTests {
             pumpEvents: { _ in }
         )
 
-        guard text == "Safari selection" else {
-            fputs("FAILED: 剪贴板已变化但文本延迟出现时仍应读取成功\n", stderr)
-            exit(1)
-        }
-        print("SelectedTextReader tests passed")
+        XCTAssertEqual(text, "Safari selection")
     }
 }

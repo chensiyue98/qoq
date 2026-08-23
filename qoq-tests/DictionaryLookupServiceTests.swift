@@ -1,38 +1,41 @@
-import Foundation
+import XCTest
+@testable import QoQ
 
-@main
 @MainActor
-enum DictionaryLookupServiceTests {
-    static func main() {
-        guard DictionaryLookupService.isEligible("serendipity") else {
-            fail("短词应允许词典查询")
-        }
-        guard !DictionaryLookupService.isEligible(String(repeating: "a", count: 41)) else {
-            fail("超过 40 个字符不应触发词典查询")
-        }
-        guard !DictionaryLookupService.isEligible("first line\nsecond line") else {
-            fail("多行文本不应触发词典查询")
-        }
-        guard !DictionaryLookupService.isEligible("12345 !?") else {
-            fail("纯数字和符号不应触发词典查询")
-        }
-
-        let model = TranslationModel(dictionaryLookup: { _ in "意外发现美好事物的能力或运气" })
-        guard model.useDictionaryFallbackIfAvailable(for: "serendipity"),
-              model.translatedText == "意外发现美好事物的能力或运气",
-              model.outputTitle == "词典释义" else {
-            fail("词典命中后应显示释义并明确标注结果类型")
-        }
-
-        model.dictionaryFallbackMode = DictionaryFallbackMode.disabled.rawValue
-        guard !model.useDictionaryFallbackIfAvailable(for: "serendipity") else {
-            fail("关闭备用词典后不应执行词典查询")
-        }
-        print("DictionaryLookupService tests passed")
+final class DictionaryLookupServiceTests: XCTestCase {
+    func testEligibility() {
+        XCTAssertTrue(DictionaryLookupService.isEligible("serendipity"))
+        XCTAssertFalse(DictionaryLookupService.isEligible(String(repeating: "a", count: 41)))
+        XCTAssertFalse(DictionaryLookupService.isEligible("first line\nsecond line"))
+        XCTAssertFalse(DictionaryLookupService.isEligible("12345 !?"))
     }
 
-    private static func fail(_ message: String) -> Never {
-        fputs("FAILED: \(message)\n", stderr)
-        exit(1)
+    func testDictionaryFallbackUpdatesModel() {
+        let previousMode = UserDefaults.standard.object(forKey: "dictionaryFallbackMode")
+        defer { restoreDictionaryFallbackMode(previousMode) }
+
+        let model = TranslationModel(dictionaryLookup: { _ in "意外发现美好事物的能力或运气" })
+        model.dictionaryFallbackMode = DictionaryFallbackMode.system.rawValue
+
+        XCTAssertTrue(model.useDictionaryFallbackIfAvailable(for: "serendipity"))
+        XCTAssertEqual(model.translatedText, "意外发现美好事物的能力或运气")
+        XCTAssertEqual(model.outputTitle, "词典释义")
+    }
+
+    func testDisabledFallbackDoesNotQueryDictionary() {
+        let previousMode = UserDefaults.standard.object(forKey: "dictionaryFallbackMode")
+        defer { restoreDictionaryFallbackMode(previousMode) }
+
+        let model = TranslationModel(dictionaryLookup: { _ in "definition" })
+        model.dictionaryFallbackMode = DictionaryFallbackMode.disabled.rawValue
+        XCTAssertFalse(model.useDictionaryFallbackIfAvailable(for: "serendipity"))
+    }
+
+    private func restoreDictionaryFallbackMode(_ value: Any?) {
+        if let value {
+            UserDefaults.standard.set(value, forKey: "dictionaryFallbackMode")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "dictionaryFallbackMode")
+        }
     }
 }

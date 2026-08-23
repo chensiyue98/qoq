@@ -1,8 +1,8 @@
-import Foundation
+import XCTest
+@testable import QoQ
 
-@main
-enum TranslationSourcePreprocessorTests {
-    static func main() {
+final class TranslationSourcePreprocessorTests: XCTestCase {
+    func testRemovesLinePrefixesAndLineBreaks() {
         let source = """
         // first line
         # second line
@@ -10,28 +10,21 @@ enum TranslationSourcePreprocessorTests {
         / fourth line
         - fifth line
         """
-        let cleaned = TranslationSourcePreprocessor.process(
-            source,
-            replaceLineBreaks: true,
-            removeCommentMarkers: true,
-            removeDashPrefixes: true
+        XCTAssertEqual(
+            TranslationSourcePreprocessor.process(source, replaceLineBreaks: true, removeCommentMarkers: true, removeDashPrefixes: true),
+            "first line second line third line fourth line fifth line"
         )
-        guard cleaned == "first line second line third line fourth line fifth line" else {
-            fputs("FAILED: 原文预处理没有按顺序清理注释、列表前缀和换行\n", stderr)
-            exit(1)
-        }
+    }
 
-        let untouched = TranslationSourcePreprocessor.process(
-            "https://example.com/a-b\nvalue #1",
-            replaceLineBreaks: false,
-            removeCommentMarkers: true,
-            removeDashPrefixes: true
+    func testPreservesInlineURLHyphenAndHash() {
+        XCTAssertEqual(
+            TranslationSourcePreprocessor.process(
+                "https://example.com/a-b\nvalue #1",
+                replaceLineBreaks: false,
+                removeCommentMarkers: true,
+                removeDashPrefixes: true
+            ),
+            "https://example.com/a-b\nvalue #1"
         )
-        guard untouched == "https://example.com/a-b\nvalue #1" else {
-            fputs("FAILED: 原文预处理不应删除行内 URL、连字符或井号\n", stderr)
-            exit(1)
-        }
-
-        print("TranslationSourcePreprocessor tests passed")
     }
 }
