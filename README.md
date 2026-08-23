@@ -15,6 +15,34 @@ A native macOS menu bar translation app built entirely on system frameworks.
 - Localized interface in Simplified Chinese, Traditional Chinese, English, Japanese, and Korean
 - System-localized language names and 19 commonly used translation languages
 
+## Installation
+
+### Homebrew
+
+```bash
+brew tap chensiyue98/tap
+brew install --cask qoq
+```
+
+Upgrade to the latest version with:
+
+```bash
+brew update
+brew upgrade --cask qoq
+```
+
+### GitHub Releases
+
+Download the latest `QoQ-<version>.zip` from [GitHub Releases](https://github.com/chensiyue98/qoq/releases), extract it, and move `QoQ.app` to the Applications folder.
+
+### Mac App Store
+
+The Mac App Store version will be available after App Review. A direct store link will be added here when it is published.
+
+### Build from source
+
+Clone the repository, open `qoq.xcodeproj` with Xcode, select the `QoQ-Direct` scheme, and run the app.
+
 ## Requirements
 
 - macOS 26.0+
@@ -22,4 +50,4 @@ A native macOS menu bar translation app built entirely on system frameworks.
 - Accessibility permission for translating selected text
 - Screen & System Audio Recording permission for screen-region OCR
 
-Open `qoq.xcodeproj` in Xcode and run the app. macOS may ask to download the required language resources the first time you translate a language pair.
+macOS may ask to download the required language resources the first time you translate a language pair.
