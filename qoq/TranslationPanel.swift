@@ -3,6 +3,15 @@ import Combine
 import SwiftUI
 import Translation
 
+@MainActor
+enum QoQSettingsOpener {
+    static let requestNotification = Notification.Name("QoQOpenSettingsRequested")
+
+    static func open() {
+        NotificationCenter.default.post(name: requestNotification, object: nil)
+    }
+}
+
 enum TranslationWindowPosition: String, CaseIterable, Identifiable {
     case screenCenter
     case nearPointer
@@ -198,6 +207,61 @@ private struct TranslationPinButton: View {
     }
 }
 
+private struct TranslationTitlebarControls: View {
+    @ObservedObject var model: TranslationModel
+    @ObservedObject var state: TranslationPanelState
+    @AppStorage(TranslationBehaviorKey.showInputField) private var showInputField = true
+    @AppStorage(TranslationBehaviorKey.showLanguageBar) private var showLanguageBar = true
+    @AppStorage(TranslationBehaviorKey.replaceLineBreaks) private var replaceLineBreaks = false
+    @AppStorage(TranslationBehaviorKey.removeCommentMarkers) private var removeCommentMarkers = false
+    @AppStorage(TranslationBehaviorKey.removeDashPrefixes) private var removeDashPrefixes = false
+    @AppStorage(TranslationBehaviorKey.copyOCRResult) private var copyOCRResult = false
+    @AppStorage(TranslationBehaviorKey.copyFirstTranslation) private var copyFirstTranslation = false
+    @AppStorage(TranslationBehaviorKey.speakSourceText) private var speakSourceText = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            TranslationPinButton(state: state)
+            Menu {
+                Toggle("显示输入框", isOn: $showInputField)
+                Toggle("显示语言切换栏", isOn: $showLanguageBar)
+                Divider()
+                Toggle("将原文换行替换为空格", isOn: $replaceLineBreaks)
+                Toggle("去掉原文的代码注释符号", isOn: $removeCommentMarkers)
+                Toggle("去掉原文行首的“- ”", isOn: $removeDashPrefixes)
+                Divider()
+                Toggle("自动复制识别文字", isOn: $copyOCRResult)
+                Toggle("自动复制翻译", isOn: $copyFirstTranslation)
+                Toggle("自动朗读翻译原文", isOn: $speakSourceText)
+                Divider()
+                Button {
+                    state.isPinned.toggle()
+                } label: {
+                    if state.isPinned {
+                        Label("固定窗口置顶", systemImage: "checkmark")
+                    } else {
+                        Text("固定窗口置顶")
+                    }
+                }
+                Divider()
+                Button("前往设置") {
+                    QoQSettingsOpener.open()
+                }
+            } label: {
+                Image(systemName: "switch.2")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, height: 20)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .translationHoverControl()
+            .help("更多操作")
+            .accessibilityLabel("更多操作")
+        }
+    }
+}
+
 fileprivate struct TranslationHoverButtonStyle: ButtonStyle {
     let compact: Bool
 
@@ -226,6 +290,25 @@ private struct TranslationHoverBackground: NSViewRepresentable {
 
     func updateNSView(_ view: TranslationHoverTrackingView, context: Context) {
         view.synchronizeHoverState()
+    }
+}
+
+private struct TranslationHoverControlModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 6)
+            .frame(minHeight: 28)
+            .background(
+                TranslationHoverBackground()
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+}
+
+private extension View {
+    func translationHoverControl() -> some View {
+        modifier(TranslationHoverControlModifier())
     }
 }
 
@@ -326,15 +409,22 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
             rootView: TranslationPanelView(model: model, state: state)
         )
         super.init(window: panel)
-        let pinAccessory = NSTitlebarAccessoryViewController()
-        pinAccessory.layoutAttribute = .right
-        let pinHostingView = NSHostingView(
-            rootView: TranslationPinButton(state: state)
-                .frame(width: 36, height: 28)
+        let controlsAccessory = NSTitlebarAccessoryViewController()
+        controlsAccessory.layoutAttribute = .right
+        let controlsHostingView = NSHostingView(
+            rootView: TranslationTitlebarControls(model: model, state: state)
+                .padding(.trailing, 12)
+                .fixedSize()
         )
-        pinHostingView.frame = NSRect(x: 0, y: 0, width: 36, height: 28)
-        pinAccessory.view = pinHostingView
-        panel.addTitlebarAccessoryViewController(pinAccessory)
+        let measuredSize = controlsHostingView.fittingSize
+        controlsHostingView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: ceil(measuredSize.width),
+            height: max(28, ceil(measuredSize.height))
+        )
+        controlsAccessory.view = controlsHostingView
+        panel.addTitlebarAccessoryViewController(controlsAccessory)
         panel.delegate = self
     }
 
@@ -389,6 +479,8 @@ struct TranslationPanelView: View {
     @ObservedObject var model: TranslationModel
     @ObservedObject var state: TranslationPanelState
     @AppStorage("translationAppearanceMode") private var appearanceMode = TranslationAppearanceMode.automatic.rawValue
+    @AppStorage(TranslationBehaviorKey.showInputField) private var showInputField = true
+    @AppStorage(TranslationBehaviorKey.showLanguageBar) private var showLanguageBar = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -414,28 +506,32 @@ struct TranslationPanelView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
             Spacer()
-            Menu(model.sourceName) {
-                Button("重新自动检测") { model.retryAutomaticDetection() }
-                Divider()
-                ForEach(LanguageChoice.supported) { language in
-                    Button(language.title) { model.chooseSourceLanguage(language.id) }
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .foregroundStyle(model.needsSourceSelection ? Color.accentColor : Color.secondary)
-            Image(systemName: "arrow.right")
-                .foregroundStyle(.tertiary)
-            Menu(model.targetName) {
-                ForEach(LanguageChoice.supported) { language in
-                    Button(language.title) {
-                        model.targetLanguage = language.id
-                        if !model.sourceText.isEmpty { model.retranslate() }
+            if showLanguageBar {
+                Menu(model.sourceName) {
+                    Button("重新自动检测") { model.retryAutomaticDetection() }
+                    Divider()
+                    ForEach(LanguageChoice.supported) { language in
+                        Button(language.title) { model.chooseSourceLanguage(language.id) }
                     }
                 }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .foregroundStyle(model.needsSourceSelection ? Color.accentColor : Color.secondary)
+                .translationHoverControl()
+                Image(systemName: "arrow.right")
+                    .foregroundStyle(.tertiary)
+                Menu(model.targetName) {
+                    ForEach(LanguageChoice.supported) { language in
+                        Button(language.title) {
+                            model.targetLanguage = language.id
+                            if !model.sourceText.isEmpty { model.retranslate() }
+                        }
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .translationHoverControl()
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
         }
         .font(.system(size: 13))
         .padding(.horizontal, 18)
@@ -445,8 +541,10 @@ struct TranslationPanelView: View {
 
     @ViewBuilder private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
-            editableSourceSection
-            Divider()
+            if showInputField {
+                editableSourceSection
+                Divider()
+            }
             if let error = model.errorMessage {
                 ContentUnavailableView("无法完成翻译", systemImage: "exclamationmark.triangle", description: Text(error))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

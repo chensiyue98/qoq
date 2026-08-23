@@ -15,6 +15,11 @@ enum TranslationPanelTests {
             fputs("FAILED: 翻译窗口必须使用透明底层，才能单独控制背景材质\n", stderr)
             exit(1)
         }
+        guard let titlebarControls = controller.window?.titlebarAccessoryViewControllers.first?.view,
+              titlebarControls.frame.width > 74 else {
+            fputs("FAILED: 右上角标题栏控件必须按实际内容测量，不能被旧的固定宽度裁切\n", stderr)
+            exit(1)
+        }
         guard let contentView = controller.window?.contentView,
               contentView.subviews.contains(where: { $0 is NSVisualEffectView }),
               contentView.subviews.contains(where: { $0 is NSHostingView<TranslationPanelView> }) else {

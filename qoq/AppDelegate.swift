@@ -10,9 +10,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: TranslationPanelController?
     private var selector: ScreenSelectionController?
     private var permissionGuide: PermissionGuideController?
+    private var settingsWindowController: NSWindowController?
+    private var settingsRequestObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        settingsRequestObserver = NotificationCenter.default.addObserver(
+            forName: QoQSettingsOpener.requestNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.showSettings()
+            }
+        }
         panel = TranslationPanelController(model: model)
         hotKeys = HotKeyManager(
             selection: shortcuts.selection,
@@ -41,6 +52,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func showSettings() {
+        if settingsWindowController == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 640, height: 600),
+                styleMask: [.titled, .closable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "QoQ 设置"
+            window.isReleasedWhenClosed = false
+            window.minSize = NSSize(width: 560, height: 520)
+            window.contentView = NSHostingView(
+                rootView: SettingsView(model: model, shortcuts: shortcuts)
+                    .frame(minWidth: 560, minHeight: 520)
+            )
+            window.center()
+            settingsWindowController = NSWindowController(window: window)
+        }
+        settingsWindowController?.showWindow(nil)
+        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     func translateSelection() {
         do {
             let text = try SelectedTextReader.read()
@@ -64,6 +98,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task {
                     do {
                         let text = try await ScreenOCRService.recognize(capture.image)
+                        if UserDefaults.standard.bool(forKey: TranslationBehaviorKey.copyOCRResult) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(text, forType: .string)
+                        }
                         self.panel?.show(text: text, source: .screen)
                     } catch {
                         self.panel?.show(error: error.localizedDescription)

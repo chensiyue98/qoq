@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Combine
 import CoreServices
 import Foundation
@@ -20,6 +21,46 @@ enum TranslationSource {
 enum TranslationOutputKind {
     case translation
     case dictionaryDefinition
+}
+
+enum TranslationBehaviorKey {
+    static let showInputField = "showTranslationInputField"
+    static let showLanguageBar = "showTranslationLanguageBar"
+    static let replaceLineBreaks = "replaceSourceLineBreaks"
+    static let removeCommentMarkers = "removeSourceCommentMarkers"
+    static let removeDashPrefixes = "removeSourceDashPrefixes"
+    static let copyOCRResult = "copyOCRResultAutomatically"
+    static let copyFirstTranslation = "copyFirstTranslationAutomatically"
+    static let speakSourceText = "speakSourceTextAutomatically"
+}
+
+enum TranslationSourcePreprocessor {
+    nonisolated static func process(
+        _ text: String,
+        replaceLineBreaks: Bool,
+        removeCommentMarkers: Bool,
+        removeDashPrefixes: Bool
+    ) -> String {
+        var result = text
+        if removeCommentMarkers {
+            result = result
+                .replacingOccurrences(of: #"(?m)^(\s*)[/\*#]+\s?"#, with: "$1", options: .regularExpression)
+                .replacingOccurrences(of: #"(?m)\s*\*/\s*$"#, with: "", options: .regularExpression)
+        }
+        if removeDashPrefixes {
+            result = result.replacingOccurrences(
+                of: #"(?m)^(\s*)[-–—]\s+"#,
+                with: "$1",
+                options: .regularExpression
+            )
+        }
+        if replaceLineBreaks {
+            result = result
+                .replacingOccurrences(of: #"\s*[\r\n]+\s*"#, with: " ", options: .regularExpression)
+                .replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 enum DictionaryFallbackMode: String, CaseIterable, Identifiable {
@@ -220,6 +261,8 @@ final class TranslationModel: ObservableObject {
     }
     @Published var configuration: TranslationSession.Configuration?
     private let dictionaryLookup: (String) -> String?
+    private let speechSynthesizer = AVSpeechSynthesizer()
+    private var shouldCopyCurrentResult = false
 
     init(dictionaryLookup: @escaping (String) -> String? = DictionaryLookupService.definition) {
         targetLanguage = UserDefaults.standard.string(forKey: "targetLanguage") ?? "zh-Hans"
@@ -253,16 +296,27 @@ final class TranslationModel: ObservableObject {
     }
 
     func requestTranslation(_ text: String, source: TranslationSource) {
-        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let defaults = UserDefaults.standard
+        let clean = TranslationSourcePreprocessor.process(
+            text,
+            replaceLineBreaks: defaults.bool(forKey: TranslationBehaviorKey.replaceLineBreaks),
+            removeCommentMarkers: defaults.bool(forKey: TranslationBehaviorKey.removeCommentMarkers),
+            removeDashPrefixes: defaults.bool(forKey: TranslationBehaviorKey.removeDashPrefixes)
+        )
         guard !clean.isEmpty else {
             showError("没有找到可翻译的文字。")
             return
         }
+        shouldCopyCurrentResult = defaults.bool(forKey: TranslationBehaviorKey.copyFirstTranslation)
         sourceText = clean
         translatedText = ""
         outputKind = .translation
         self.source = source
         errorMessage = nil
+        if defaults.bool(forKey: TranslationBehaviorKey.speakSourceText) {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+            speechSynthesizer.speak(AVSpeechUtterance(string: clean))
+        }
         sourceLanguage = detectLanguage(in: clean)
         guard let sourceLanguage else {
             configuration = nil
@@ -301,7 +355,7 @@ final class TranslationModel: ObservableObject {
             sourceLanguage: sourceIdentifier,
             targetLanguage: resolvedTargetLanguage
         ) {
-            translatedText = converted
+            completeOutput(converted, kind: .translation)
             isWorking = false
             configuration = nil
             return
@@ -326,8 +380,7 @@ final class TranslationModel: ObservableObject {
               let definition = dictionaryLookup(text) else {
             return false
         }
-        translatedText = definition
-        outputKind = .dictionaryDefinition
+        completeOutput(definition, kind: .dictionaryDefinition)
         needsSourceSelection = false
         isWorking = false
         configuration = nil
@@ -351,11 +404,12 @@ final class TranslationModel: ObservableObject {
     func perform(using session: TranslationSession) async {
         do {
             let response = try await session.translate(sourceText)
-            translatedText = LineBreakNormalizer.normalize(
+            let normalized = LineBreakNormalizer.normalize(
                 response.targetText,
                 sourceText: sourceText,
                 targetLanguage: activeTargetLanguage
             )
+            completeOutput(normalized, kind: .translation)
             isWorking = false
         } catch {
             showError("翻译失败：\(error.localizedDescription)")
@@ -373,6 +427,15 @@ final class TranslationModel: ObservableObject {
 
     func copySourceText() {
         copyToPasteboard(sourceText)
+    }
+
+    private func completeOutput(_ text: String, kind: TranslationOutputKind) {
+        translatedText = text
+        outputKind = kind
+        if shouldCopyCurrentResult {
+            copyToPasteboard(text)
+            shouldCopyCurrentResult = false
+        }
     }
 
     private func copyToPasteboard(_ text: String) {

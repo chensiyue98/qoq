@@ -18,8 +18,8 @@ struct QoQApp: App {
             Button("权限引导…") {
                 appDelegate.showPermissionGuide()
             }
-            SettingsLink {
-                Text("设置…")
+            Button("设置…") {
+                appDelegate.showSettings()
             }
 
             Divider()
@@ -30,10 +30,5 @@ struct QoQApp: App {
             .keyboardShortcut("q")
         }
         .menuBarExtraStyle(.menu)
-
-        Settings {
-            SettingsView(model: appDelegate.model, shortcuts: appDelegate.shortcuts)
-                .frame(width: 520, height: 570)
-        }
     }
 }
