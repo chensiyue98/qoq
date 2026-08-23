@@ -21,6 +21,7 @@
 		A1000000000000000000000C /* LineBreakNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* LineBreakNormalizer.swift */; };
 		A1000000000000000000000D /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Localization.swift */; };
 		A1000000000000000000000E /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000000 /* Localizable.strings */; };
+		A1000000000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* Assets.xcassets */; };
 		D1AB6E6D303B6C56007D5046 /* ChineseVariantConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1AB6E61303B6C56007D5046 /* ChineseVariantConverterTests.swift */; };
 		D1AB6E6E303B6C56007D5046 /* DictionaryLookupServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1AB6E63303B6C56007D5046 /* DictionaryLookupServiceTests.swift */; };
 		D1AB6E6F303B6C56007D5046 /* SelectedTextReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1AB6E67303B6C56007D5046 /* SelectedTextReaderTests.swift */; };
@@ -59,6 +60,7 @@
 		A2000000000000000000000B /* ShortcutPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutPreferences.swift; sourceTree = "<group>"; };
 		A2000000000000000000000C /* LineBreakNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineBreakNormalizer.swift; sourceTree = "<group>"; };
 		A2000000000000000000000D /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		A2000000000000000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A31000000000000000000001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A31000000000000000000002 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A31000000000000000000003 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -130,6 +132,7 @@
 				A2000000000000000000000B /* ShortcutPreferences.swift */,
 				A2000000000000000000000C /* LineBreakNormalizer.swift */,
 				A2000000000000000000000D /* Localization.swift */,
+				A2000000000000000000000E /* Assets.xcassets */,
 				A30000000000000000000000 /* Localizable.strings */,
 			);
 			path = qoq;
@@ -247,6 +250,7 @@
 			isa = PBXResourcesBuildPhase;
 			files = (
 				A1000000000000000000000E /* Localizable.strings in Resources */,
+				A1000000000000000000000F /* Assets.xcassets in Resources */,
 			);
 		};
 		D1AB6E56303B6AFC007D5046 /* Resources */ = {
@@ -454,6 +458,7 @@
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "QoQ" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -510,6 +515,7 @@
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "QoQ" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -629,6 +635,7 @@
 		D17BD03B303B8C270025889B /* Release-AppStore configuration for PBXNativeTarget "QoQ" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				AUTOMATION_APPLE_EVENTS = NO;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = Config/AppStore.entitlements;
 				CODE_SIGN_STYLE = Automatic;
