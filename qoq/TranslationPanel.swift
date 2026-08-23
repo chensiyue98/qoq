@@ -732,9 +732,6 @@ struct TranslationPanelView: View {
 
     private var footer: some View {
         HStack {
-            Text("全局快捷键可在设置中自定义")
-                .font(.system(size: 11, design: .rounded))
-                .foregroundStyle(.tertiary)
             Spacer()
             Button { model.translateEditedText() } label: {
                 Label("重新翻译", systemImage: "arrow.clockwise")
