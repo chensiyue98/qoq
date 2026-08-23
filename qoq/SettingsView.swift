@@ -198,12 +198,7 @@ final class OfflineLanguageManager: ObservableObject {
     @Published var sourceLanguage = "en"
     @Published var targetLanguage = "zh-Hans"
     @Published var downloadConfiguration: TranslationSession.Configuration?
-    private let availability: LanguageAvailability = {
-        if #available(macOS 26.4, *) {
-            return LanguageAvailability(preferredStrategy: strategy)
-        }
-        return LanguageAvailability()
-    }()
+    private let availability = LanguageAvailability()
 
     func refresh() async {
         let source = sourceLanguage
