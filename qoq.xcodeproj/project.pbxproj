@@ -631,7 +631,6 @@
 			buildSettings = {
 				AUTOMATION_APPLE_EVENTS = NO;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = Config/AppStore.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4SGGP72YQZ;
