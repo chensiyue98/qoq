@@ -180,6 +180,24 @@ final class TranslationPanelState: ObservableObject {
     @Published var isPinned = false
 }
 
+private struct TranslationPinButton: View {
+    @ObservedObject var state: TranslationPanelState
+
+    var body: some View {
+        Button {
+            state.isPinned.toggle()
+        } label: {
+            Image(systemName: state.isPinned ? "pin.fill" : "pin")
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(state.isPinned ? Color.accentColor : Color.secondary)
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(TranslationHoverButtonStyle(compact: true))
+        .help(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
+        .accessibilityLabel(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
+    }
+}
+
 fileprivate struct TranslationHoverButtonStyle: ButtonStyle {
     let compact: Bool
 
@@ -207,7 +225,7 @@ private struct TranslationHoverBackground: NSViewRepresentable {
     }
 
     func updateNSView(_ view: TranslationHoverTrackingView, context: Context) {
-        view.refreshColor()
+        view.synchronizeHoverState()
     }
 }
 
@@ -226,6 +244,7 @@ private final class TranslationHoverTrackingView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func updateTrackingAreas() {
+        super.updateTrackingAreas()
         if let hoverTrackingArea { removeTrackingArea(hoverTrackingArea) }
         let area = NSTrackingArea(
             rect: bounds,
@@ -234,25 +253,46 @@ private final class TranslationHoverTrackingView: NSView {
         )
         addTrackingArea(area)
         hoverTrackingArea = area
-        super.updateTrackingAreas()
+        synchronizeHoverState()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        synchronizeHoverState()
+    }
+
+    override func layout() {
+        super.layout()
+        synchronizeHoverState()
     }
 
     override func mouseEntered(with event: NSEvent) {
         isHovered = true
-        refreshColor()
+        applyColor()
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovered = false
-        refreshColor()
+        applyColor()
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        refreshColor()
+        applyColor()
     }
 
-    func refreshColor() {
+    func synchronizeHoverState() {
+        guard let window else {
+            isHovered = false
+            applyColor()
+            return
+        }
+        let pointer = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        isHovered = bounds.contains(pointer)
+        applyColor()
+    }
+
+    private func applyColor() {
         layer?.backgroundColor = isHovered
             ? NSColor.labelColor.withAlphaComponent(0.09).cgColor
             : NSColor.clear.cgColor
@@ -286,6 +326,15 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
             rootView: TranslationPanelView(model: model, state: state)
         )
         super.init(window: panel)
+        let pinAccessory = NSTitlebarAccessoryViewController()
+        pinAccessory.layoutAttribute = .right
+        let pinHostingView = NSHostingView(
+            rootView: TranslationPinButton(state: state)
+                .frame(width: 36, height: 28)
+        )
+        pinHostingView.frame = NSRect(x: 0, y: 0, width: 36, height: 28)
+        pinAccessory.view = pinHostingView
+        panel.addTitlebarAccessoryViewController(pinAccessory)
         panel.delegate = self
     }
 
@@ -365,17 +414,6 @@ struct TranslationPanelView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
             Spacer()
-            Button {
-                state.isPinned.toggle()
-            } label: {
-                Image(systemName: state.isPinned ? "pin.fill" : "pin")
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(state.isPinned ? Color.accentColor : Color.secondary)
-                    .frame(width: 20, height: 20)
-            }
-            .buttonStyle(TranslationHoverButtonStyle(compact: true))
-            .help(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
-            .accessibilityLabel(state.isPinned ? "取消固定窗口" : "固定窗口置顶")
             Menu(model.sourceName) {
                 Button("重新自动检测") { model.retryAutomaticDetection() }
                 Divider()
