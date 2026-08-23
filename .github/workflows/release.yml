@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 60
 
     env:
-      SCHEME: qoq
+      SCHEME: QoQ
       PROJECT: qoq.xcodeproj
       TEAM_ID: 4SGGP72YQZ
 
