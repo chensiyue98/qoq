@@ -63,7 +63,7 @@ final class UpdateChecker: ObservableObject {
 
     private func performCheck() async {
         do {
-            let endpoint = URL(string: "https://api.github.com/repos/chensiyuechen/qoq/releases/latest")!
+            let endpoint = URL(string: "https://api.github.com/repos/chensiyue98/qoq/releases/latest")!
             var request = URLRequest(url: endpoint)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
             request.setValue("QoQ Update Checker", forHTTPHeaderField: "User-Agent")

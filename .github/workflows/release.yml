@@ -35,6 +35,7 @@ jobs:
       SCHEME: QoQ
       PROJECT: qoq.xcodeproj
       TEAM_ID: 4SGGP72YQZ
+      TAP_REPOSITORY: chensiyue98/homebrew-tap
 
     steps:
       - name: Checkout
@@ -321,6 +322,86 @@ jobs:
           fi
 
           gh release create "${RELEASE_ARGS[@]}"
+
+      - name: Calculate Homebrew Cask checksum
+        if: ${{ inputs.prerelease == false }}
+        id: homebrew
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          SHA256="$(shasum -a 256 "$ASSET_PATH" | awk '{print $1}')"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Homebrew Tap
+        if: ${{ inputs.prerelease == false }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TAP_REPOSITORY }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update Homebrew Cask
+        if: ${{ inputs.prerelease == false }}
+        shell: bash
+        working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.homebrew.outputs.version }}
+          SHA256: ${{ steps.homebrew.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+
+          CASK_PATH="Casks/qoq.rb"
+          test -f "$CASK_PATH"
+
+          perl -0pi -e \
+            's/version "[^"]+"/version "$ENV{VERSION}"/; s/sha256 "[^"]+"/sha256 "$ENV{SHA256}"/' \
+            "$CASK_PATH"
+
+          grep -Fq "version \"$VERSION\"" "$CASK_PATH"
+          grep -Fq "sha256 \"$SHA256\"" "$CASK_PATH"
+          git diff --check
+          git diff -- "$CASK_PATH"
+
+      - name: Audit Homebrew Cask
+        if: ${{ inputs.prerelease == false }}
+        shell: bash
+        working-directory: homebrew-tap
+        run: |
+          set -euo pipefail
+          brew audit --cask --strict ./Casks/qoq.rb
+
+      - name: Create Homebrew Cask update PR
+        if: ${{ inputs.prerelease == false }}
+        shell: bash
+        working-directory: homebrew-tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.homebrew.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="update-qoq-$VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git switch -c "$BRANCH"
+          git add Casks/qoq.rb
+          git commit -m "Update QoQ to $VERSION"
+          git push --set-upstream origin "$BRANCH"
+
+          gh pr create \
+            --repo "$TAP_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Update QoQ to $VERSION" \
+            --body "Updates the QoQ Cask to GitHub release v$VERSION."
 
       - name: Upload diagnostic artifact on failure
         if: failure()
