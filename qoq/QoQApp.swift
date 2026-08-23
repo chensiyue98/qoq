@@ -33,7 +33,7 @@ struct QoQApp: App {
 
         Settings {
             SettingsView(model: appDelegate.model, shortcuts: appDelegate.shortcuts)
-                .frame(width: 460, height: 400)
+                .frame(width: 520, height: 570)
         }
     }
 }
