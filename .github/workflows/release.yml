@@ -95,17 +95,23 @@ jobs:
       - name: Create temporary keychain
         shell: bash
         env:
-          CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_P12_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
+          DEVELOPMENT_CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPMENT_P12_BASE64 }}
+          DEVELOPMENT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPMENT_P12_PASSWORD }}
+          DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_P12_BASE64 }}
+          DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
 
-          CERTIFICATE_PATH="$RUNNER_TEMP/apple-distribution.p12"
+          DEVELOPMENT_CERTIFICATE_PATH="$RUNNER_TEMP/apple-development.p12"
+          DISTRIBUTION_CERTIFICATE_PATH="$RUNNER_TEMP/apple-distribution.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/qoq-app-store.keychain-db"
 
-          printf '%s' "$CERTIFICATE_BASE64" |
-            base64 --decode > "$CERTIFICATE_PATH"
+          printf '%s' "$DEVELOPMENT_CERTIFICATE_BASE64" |
+            base64 --decode > "$DEVELOPMENT_CERTIFICATE_PATH"
+
+          printf '%s' "$DISTRIBUTION_CERTIFICATE_BASE64" |
+            base64 --decode > "$DISTRIBUTION_CERTIFICATE_PATH"
 
           security create-keychain \
             -p "$KEYCHAIN_PASSWORD" \
@@ -119,8 +125,15 @@ jobs:
             -p "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_PATH"
 
-          security import "$CERTIFICATE_PATH" \
-            -P "$CERTIFICATE_PASSWORD" \
+          security import "$DEVELOPMENT_CERTIFICATE_PATH" \
+            -P "$DEVELOPMENT_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security import "$DISTRIBUTION_CERTIFICATE_PATH" \
+            -P "$DISTRIBUTION_CERTIFICATE_PASSWORD" \
             -A \
             -t cert \
             -f pkcs12 \
