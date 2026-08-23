@@ -107,11 +107,48 @@ jobs:
           DISTRIBUTION_CERTIFICATE_PATH="$RUNNER_TEMP/apple-distribution.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/qoq-app-store.keychain-db"
 
-          printf '%s' "$DEVELOPMENT_CERTIFICATE_BASE64" |
-            base64 --decode > "$DEVELOPMENT_CERTIFICATE_PATH"
+          decode_and_validate_certificate() {
+            local label="$1"
+            local payload_variable="$2"
+            local password_variable="$3"
+            local certificate_path="$4"
+            local payload="${!payload_variable}"
 
-          printf '%s' "$DISTRIBUTION_CERTIFICATE_BASE64" |
-            base64 --decode > "$DISTRIBUTION_CERTIFICATE_PATH"
+            if [[ -z "$payload" ]]; then
+              echo "Missing $label certificate secret: $payload_variable"
+              exit 1
+            fi
+
+            if ! printf '%s' "$payload" | base64 --decode > "$certificate_path"; then
+              echo "Invalid Base64 in $label certificate secret: $payload_variable"
+              exit 1
+            fi
+
+            if [[ ! -s "$certificate_path" ]]; then
+              echo "Decoded $label certificate is empty: $payload_variable"
+              exit 1
+            fi
+
+            if ! openssl pkcs12 \
+              -in "$certificate_path" \
+              -noout \
+              -passin "env:$password_variable"; then
+              echo "Invalid $label PKCS#12 data or password: $password_variable"
+              exit 1
+            fi
+          }
+
+          decode_and_validate_certificate \
+            "Apple Development" \
+            DEVELOPMENT_CERTIFICATE_BASE64 \
+            DEVELOPMENT_CERTIFICATE_PASSWORD \
+            "$DEVELOPMENT_CERTIFICATE_PATH"
+
+          decode_and_validate_certificate \
+            "Apple Distribution" \
+            DISTRIBUTION_CERTIFICATE_BASE64 \
+            DISTRIBUTION_CERTIFICATE_PASSWORD \
+            "$DISTRIBUTION_CERTIFICATE_PATH"
 
           security create-keychain \
             -p "$KEYCHAIN_PASSWORD" \
@@ -125,6 +162,7 @@ jobs:
             -p "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_PATH"
 
+          echo "Importing Apple Development certificate"
           security import "$DEVELOPMENT_CERTIFICATE_PATH" \
             -P "$DEVELOPMENT_CERTIFICATE_PASSWORD" \
             -A \
@@ -132,6 +170,7 @@ jobs:
             -f pkcs12 \
             -k "$KEYCHAIN_PATH"
 
+          echo "Importing Apple Distribution certificate"
           security import "$DISTRIBUTION_CERTIFICATE_PATH" \
             -P "$DISTRIBUTION_CERTIFICATE_PASSWORD" \
             -A \
