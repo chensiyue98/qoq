@@ -1,5 +1,9 @@
 import AppKit
 
+final class SelectionOverlayWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+}
+
 @MainActor
 final class ScreenSelectionController {
     private var windows: [NSWindow] = []
@@ -28,13 +32,14 @@ final class ScreenSelectionController {
                     }
                 }
             }
-            let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false, screen: screen)
+            let window = SelectionOverlayWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false, screen: screen)
             window.level = .screenSaver
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             window.backgroundColor = .clear
             window.isOpaque = false
             window.hasShadow = false
             window.contentView = view
+            window.makeFirstResponder(view)
             window.makeKeyAndOrderFront(nil)
             windows.append(window)
         }
