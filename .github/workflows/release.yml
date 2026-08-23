@@ -131,6 +131,7 @@ jobs:
 
             if ! openssl pkcs12 \
               -in "$certificate_path" \
+              -legacy \
               -noout \
               -passin "env:$password_variable"; then
               echo "Invalid $label PKCS#12 data or password: $password_variable"
