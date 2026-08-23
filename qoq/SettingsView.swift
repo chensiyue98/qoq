@@ -1,8 +1,25 @@
 import AppKit
+import ApplicationServices
 import Combine
+import CoreGraphics
 import ServiceManagement
 import SwiftUI
 import Translation
+
+@MainActor
+final class PermissionStatusManager: ObservableObject {
+    @Published private(set) var accessibilityGranted = false
+    @Published private(set) var screenRecordingGranted = false
+
+    init() {
+        refresh()
+    }
+
+    func refresh() {
+        accessibilityGranted = AXIsProcessTrusted()
+        screenRecordingGranted = CGPreflightScreenCaptureAccess()
+    }
+}
 
 @MainActor
 final class UpdateChecker: ObservableObject {
@@ -237,6 +254,7 @@ struct SettingsView: View {
     @StateObject private var offlineLanguages = OfflineLanguageManager()
     @StateObject private var launchAtLogin = LaunchAtLoginManager()
     @StateObject private var updateChecker = UpdateChecker()
+    @StateObject private var permissions = PermissionStatusManager()
     @AppStorage("translationWindowPosition") private var translationWindowPosition = TranslationWindowPosition.screenCenter.rawValue
     @AppStorage("translationAppearanceMode") private var translationAppearanceMode = TranslationAppearanceMode.automatic.rawValue
     @AppStorage("translationBackgroundOpacity") private var translationBackgroundOpacity = 0.82
@@ -266,6 +284,10 @@ struct SettingsView: View {
         .padding(.top, 8)
         .onAppear {
             launchAtLogin.refresh()
+            permissions.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            permissions.refresh()
         }
         .task(id: "\(offlineLanguages.sourceLanguage)-\(offlineLanguages.targetLanguage)") {
             offlineLanguages.downloadConfiguration = nil
@@ -452,9 +474,16 @@ struct SettingsView: View {
                 }
             }
             Section("权限") {
-                Text("划词翻译需要辅助功能权限；屏幕识别需要屏幕录制权限。系统会在首次使用时请求。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                permissionRow(
+                    title: "辅助功能",
+                    description: "读取其他应用中选中的文字",
+                    granted: permissions.accessibilityGranted
+                )
+                permissionRow(
+                    title: "屏幕录制",
+                    description: "截取框选区域并识别文字",
+                    granted: permissions.screenRecordingGranted
+                )
             }
         }
         .formStyle(.grouped)
@@ -478,8 +507,11 @@ struct SettingsView: View {
             }
             Section("项目") {
                 Link(destination: URL(string: "https://github.com/chensiyue98/qoq")!) {
-                    Label("在 GitHub 上查看源代码", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label("chensiyue98/qoq", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
+                Text("在 GitHub 上查看源代码、版本发布和问题反馈。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("更新") {
                 HStack(spacing: 12) {
@@ -530,6 +562,29 @@ struct SettingsView: View {
     private var isCheckingForUpdates: Bool {
         if case .checking = updateChecker.status { return true }
         return false
+    }
+
+    private func permissionRow(
+        title: String,
+        description: String,
+        granted: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .fontWeight(.medium)
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Label(
+                granted ? "已授权" : "未授权",
+                systemImage: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
+            )
+            .foregroundStyle(granted ? Color.green : Color.orange)
+            .frame(width: 82, alignment: .leading)
+        }
     }
 
     private var versionText: String {
