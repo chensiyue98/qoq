@@ -21,6 +21,29 @@ struct GlobalShortcut: Codable, Hashable {
         return result
     }
 
+    var keyEquivalent: KeyEquivalent {
+        switch keyCode {
+        case UInt32(kVK_Space): .space
+        case UInt32(kVK_Return): .return
+        case UInt32(kVK_Tab): .tab
+        case UInt32(kVK_LeftArrow): .leftArrow
+        case UInt32(kVK_RightArrow): .rightArrow
+        case UInt32(kVK_UpArrow): .upArrow
+        case UInt32(kVK_DownArrow): .downArrow
+        default:
+            KeyEquivalent(Character((Self.keyNames[keyCode] ?? "?").lowercased()))
+        }
+    }
+
+    var eventModifiers: SwiftUI.EventModifiers {
+        var result: SwiftUI.EventModifiers = []
+        if modifiers & UInt32(controlKey) != 0 { result.insert(.control) }
+        if modifiers & UInt32(optionKey) != 0 { result.insert(.option) }
+        if modifiers & UInt32(shiftKey) != 0 { result.insert(.shift) }
+        if modifiers & UInt32(cmdKey) != 0 { result.insert(.command) }
+        return result
+    }
+
     init(keyCode: UInt32, modifiers: UInt32) {
         self.keyCode = keyCode
         self.modifiers = modifiers
