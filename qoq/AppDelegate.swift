@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeys: HotKeyManager?
     private var panel: TranslationPanelController?
     private var selector: ScreenSelectionController?
+    private let screenOperation = ScreenOperationGate()
     private var permissionGuide: PermissionGuideController?
     private var settingsWindowController: NSWindowController?
     private var settingsRequestObserver: NSObjectProtocol?
@@ -91,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel?.show(error: L("需要“屏幕与系统音频录制”权限。请在系统设置的“隐私与安全性”中允许 QoQ。"))
             return
         }
+        guard screenOperation.acquire() else { return }
         selector = ScreenSelectionController { [weak self] result in
             guard let self else { return }
             self.selector = nil
@@ -98,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .success(let capture):
                 self.panel?.showLoading(source: .screen)
                 Task {
+                    defer { self.screenOperation.release() }
                     do {
                         let text = try await ScreenOCRService.recognize(capture.image)
                         if UserDefaults.standard.bool(forKey: TranslationBehaviorKey.copyOCRResult) {
@@ -110,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             case .failure(let error):
+                self.screenOperation.release()
                 if !(error is CancellationError) { self.panel?.show(error: error.localizedDescription) }
             }
         }
@@ -121,12 +125,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel?.show(error: L("需要“屏幕与系统音频录制”权限。请在系统设置的“隐私与安全性”中允许 QoQ。"))
             return
         }
+        guard screenOperation.acquire() else { return }
         selector = ScreenSelectionController { [weak self] result in
             guard let self else { return }
             self.selector = nil
             switch result {
             case .success(let capture):
                 Task {
+                    defer { self.screenOperation.release() }
                     do {
                         let text = try await ScreenOCRService.recognize(capture.image)
                         NSPasteboard.general.clearContents()
@@ -136,6 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             case .failure(let error):
+                self.screenOperation.release()
                 if !(error is CancellationError) { self.panel?.show(error: error.localizedDescription) }
             }
         }

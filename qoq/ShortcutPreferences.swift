@@ -7,9 +7,9 @@ struct GlobalShortcut: Codable, Hashable {
     let keyCode: UInt32
     let modifiers: UInt32
 
-    static let selectionDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_D), modifiers: UInt32(cmdKey | shiftKey))
-    static let captureDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey))
-    static let extractTextDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_1), modifiers: UInt32(cmdKey | shiftKey))
+    static let selectionDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_Q), modifiers: UInt32(controlKey))
+    static let captureDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_W), modifiers: UInt32(controlKey))
+    static let extractTextDefault = GlobalShortcut(keyCode: UInt32(kVK_ANSI_E), modifiers: UInt32(controlKey))
 
     var displayName: String {
         var result = ""

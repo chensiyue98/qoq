@@ -42,6 +42,13 @@ enum TranslationSourcePreprocessor {
         removeDashPrefixes: Bool
     ) -> String {
         var result = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(
+                of: #"\n[ \t]*(?:\n[ \t]*){2,}"#,
+                with: "\n\n",
+                options: .regularExpression
+            )
         if removeCommentMarkers {
             result = result
                 .replacingOccurrences(of: #"(?m)^(\s*)[/\*#]+\s?"#, with: "$1", options: .regularExpression)

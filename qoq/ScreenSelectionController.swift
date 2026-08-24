@@ -1,5 +1,20 @@
 import AppKit
 
+@MainActor
+final class ScreenOperationGate {
+    private(set) var isActive = false
+
+    func acquire() -> Bool {
+        guard !isActive else { return false }
+        isActive = true
+        return true
+    }
+
+    func release() {
+        isActive = false
+    }
+}
+
 final class SelectionOverlayWindow: NSWindow {
     override var canBecomeKey: Bool { true }
 }

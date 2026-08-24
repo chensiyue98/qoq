@@ -2,6 +2,32 @@ import XCTest
 @testable import QoQ
 
 final class TranslationSourcePreprocessorTests: XCTestCase {
+    func testCollapsesMultipleBlankLinesIncludingWhitespaceOnlyLines() {
+        let source = "First\n\n \t\n\t\nSecond"
+
+        XCTAssertEqual(
+            TranslationSourcePreprocessor.process(
+                source,
+                replaceLineBreaks: false,
+                removeCommentMarkers: false,
+                removeDashPrefixes: false
+            ),
+            "First\n\nSecond"
+        )
+    }
+
+    func testCollapsesWindowsBlankLines() {
+        XCTAssertEqual(
+            TranslationSourcePreprocessor.process(
+                "First\r\n \r\n\r\nSecond",
+                replaceLineBreaks: false,
+                removeCommentMarkers: false,
+                removeDashPrefixes: false
+            ),
+            "First\n\nSecond"
+        )
+    }
+
     func testRemovesLinePrefixesAndLineBreaks() {
         let source = """
         // first line

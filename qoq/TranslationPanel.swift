@@ -386,13 +386,16 @@ private final class TranslationHoverTrackingView: NSView {
 
 @MainActor
 final class TranslationPanelController: NSWindowController, NSWindowDelegate {
+    static let defaultSize = NSSize(width: 520, height: 480)
+    static let minimumSize = NSSize(width: 420, height: 380)
+
     private let model: TranslationModel
     private let state = TranslationPanelState()
 
     init(model: TranslationModel) {
         self.model = model
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 390),
+            contentRect: NSRect(origin: .zero, size: Self.defaultSize),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -406,7 +409,7 @@ final class TranslationPanelController: NSWindowController, NSWindowDelegate {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
-        panel.minSize = NSSize(width: 420, height: 310)
+        panel.minSize = Self.minimumSize
         panel.contentView = TranslationPanelContainerView(
             rootView: TranslationPanelView(model: model, state: state)
         )
@@ -578,26 +581,18 @@ struct TranslationPanelView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
-            ZStack(alignment: .bottomTrailing) {
-                TextEditor(text: $model.sourceText)
-                    .font(.system(size: 15))
-                    .scrollContentBackground(.hidden)
-                    .padding(.horizontal, -5)
-                    .accessibilityLabel("原文")
-                HStack(spacing: 2) {
-                    speechIconButton(
-                        action: model.speakSourceText,
-                        label: L("朗读原文"),
-                        disabled: model.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    )
-                    copyIconButton(
-                        action: model.copySourceText,
-                        label: L("复制原文"),
-                        disabled: model.sourceText.isEmpty
-                    )
-                }
-                .padding(4)
-            }
+            TextEditor(text: $model.sourceText)
+                .font(.system(size: 15))
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, -5)
+                .accessibilityLabel("原文")
+            textActionBar(
+                speechAction: model.speakSourceText,
+                speechLabel: L("朗读原文"),
+                copyAction: model.copySourceText,
+                copyLabel: L("复制原文"),
+                disabled: model.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
         }
         .frame(
             minHeight: model.outputKind == .dictionaryDefinition ? 64 : nil,
@@ -637,30 +632,20 @@ struct TranslationPanelView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
-            ZStack(alignment: .bottomTrailing) {
-                ScrollView {
-                    Text(text)
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.trailing, 64)
-                        .padding(.bottom, 32)
-                }
-                HStack(spacing: 2) {
-                    speechIconButton(
-                        action: model.speakTranslation,
-                        label: L("朗读译文"),
-                        disabled: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    )
-                    copyIconButton(
-                        action: model.copyTranslation,
-                        label: L("复制译文"),
-                        disabled: text.isEmpty
-                    )
-                }
-                .padding(4)
+            ScrollView {
+                Text(text)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            textActionBar(
+                speechAction: model.speakTranslation,
+                speechLabel: L("朗读译文"),
+                copyAction: model.copyTranslation,
+                copyLabel: L("复制译文"),
+                disabled: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
         }
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -672,47 +657,37 @@ struct TranslationPanelView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
-            ZStack(alignment: .bottomTrailing) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let metadata = layout.metadata {
-                            Text(metadata)
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
-                                .lineSpacing(3)
-                                .textSelection(.enabled)
-                        }
-                        ForEach(layout.senses) { sense in
-                            HStack(alignment: .top, spacing: 10) {
-                                if let number = sense.number {
-                                    Text(number)
-                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(Color.accentColor)
-                                        .frame(width: 22, height: 22)
-                                        .background(Color.accentColor.opacity(0.1), in: Circle())
-                                }
-                                dictionarySense(sense.definition)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let metadata = layout.metadata {
+                        Text(metadata)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(3)
+                            .textSelection(.enabled)
+                    }
+                    ForEach(layout.senses) { sense in
+                        HStack(alignment: .top, spacing: 10) {
+                            if let number = sense.number {
+                                Text(number)
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 22, height: 22)
+                                    .background(Color.accentColor.opacity(0.1), in: Circle())
                             }
+                            dictionarySense(sense.definition)
                         }
                     }
-                    .padding(.trailing, 64)
-                    .padding(.bottom, 32)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                HStack(spacing: 2) {
-                    speechIconButton(
-                        action: model.speakTranslation,
-                        label: L("朗读译文"),
-                        disabled: model.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    )
-                    copyIconButton(
-                        action: model.copyTranslation,
-                        label: L("复制释义"),
-                        disabled: model.translatedText.isEmpty
-                    )
-                }
-                .padding(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            textActionBar(
+                speechAction: model.speakTranslation,
+                speechLabel: L("朗读译文"),
+                copyAction: model.copyTranslation,
+                copyLabel: L("复制释义"),
+                disabled: model.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
         }
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -766,6 +741,22 @@ struct TranslationPanelView: View {
         .disabled(disabled)
         .help(label)
         .accessibilityLabel(label)
+    }
+
+    private func textActionBar(
+        speechAction: @escaping () -> Void,
+        speechLabel: String,
+        copyAction: @escaping () -> Void,
+        copyLabel: String,
+        disabled: Bool
+    ) -> some View {
+        HStack(spacing: 2) {
+            Spacer(minLength: 0)
+            speechIconButton(action: speechAction, label: speechLabel, disabled: disabled)
+            copyIconButton(action: copyAction, label: copyLabel, disabled: disabled)
+        }
+        .frame(height: 28)
+        .padding(.top, 3)
     }
 
     private var footer: some View {

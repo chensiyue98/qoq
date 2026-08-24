@@ -12,6 +12,8 @@ final class TranslationPanelTests: XCTestCase {
         XCTAssertFalse(window.hidesOnDeactivate)
         XCTAssertFalse(window.isOpaque)
         XCTAssertEqual(window.backgroundColor, .clear)
+        XCTAssertEqual(TranslationPanelController.defaultSize, NSSize(width: 520, height: 480))
+        XCTAssertEqual(window.minSize, TranslationPanelController.minimumSize)
         XCTAssertGreaterThan(try XCTUnwrap(window.titlebarAccessoryViewControllers.first?.view).frame.width, 74)
 
         let contentView = try XCTUnwrap(window.contentView)

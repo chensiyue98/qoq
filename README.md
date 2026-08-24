@@ -6,9 +6,9 @@ A native macOS menu bar translation app built entirely on system frameworks.
 
 ## Features
 
-- `⌘ ⇧ D`: Read and translate text selected in the current app
-- `⌘ ⇧ 2`: Select a screen region, recognize its text with Vision OCR, and translate it
-- `⌘ ⇧ 1`: Select a screen region, extract its text with Vision OCR, and copy it to the clipboard without translating
+- `⌃ Q`: Read and translate text selected in the current app
+- `⌃ W`: Select a screen region, recognize its text with Vision OCR, and translate it
+- `⌃ E`: Select a screen region, extract its text with Vision OCR, and copy it to the clipboard without translating
 - Record and save all three custom global shortcuts in Settings
 - Translate with the macOS Translation framework—no third-party translation service required
 - Native SwiftUI overlay, menu bar controls, automatic language detection, and translation copying
