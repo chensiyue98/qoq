@@ -584,11 +584,18 @@ struct TranslationPanelView: View {
                     .scrollContentBackground(.hidden)
                     .padding(.horizontal, -5)
                     .accessibilityLabel("原文")
-                copyIconButton(
-                    action: model.copySourceText,
-                    label: L("复制原文"),
-                    disabled: model.sourceText.isEmpty
-                )
+                HStack(spacing: 2) {
+                    speechIconButton(
+                        action: model.speakSourceText,
+                        label: L("朗读原文"),
+                        disabled: model.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                    copyIconButton(
+                        action: model.copySourceText,
+                        label: L("复制原文"),
+                        disabled: model.sourceText.isEmpty
+                    )
+                }
                 .padding(4)
             }
         }
@@ -637,14 +644,21 @@ struct TranslationPanelView: View {
                         .foregroundStyle(muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.trailing, 32)
+                        .padding(.trailing, 64)
                         .padding(.bottom, 32)
                 }
-                copyIconButton(
-                    action: model.copyTranslation,
-                    label: L("复制译文"),
-                    disabled: text.isEmpty
-                )
+                HStack(spacing: 2) {
+                    speechIconButton(
+                        action: model.speakTranslation,
+                        label: L("朗读译文"),
+                        disabled: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                    copyIconButton(
+                        action: model.copyTranslation,
+                        label: L("复制译文"),
+                        disabled: text.isEmpty
+                    )
+                }
                 .padding(4)
             }
         }
@@ -681,15 +695,22 @@ struct TranslationPanelView: View {
                             }
                         }
                     }
-                    .padding(.trailing, 32)
+                    .padding(.trailing, 64)
                     .padding(.bottom, 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                copyIconButton(
-                    action: model.copyTranslation,
-                    label: L("复制释义"),
-                    disabled: model.translatedText.isEmpty
-                )
+                HStack(spacing: 2) {
+                    speechIconButton(
+                        action: model.speakTranslation,
+                        label: L("朗读译文"),
+                        disabled: model.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                    copyIconButton(
+                        action: model.copyTranslation,
+                        label: L("复制释义"),
+                        disabled: model.translatedText.isEmpty
+                    )
+                }
                 .padding(4)
             }
         }
@@ -724,6 +745,19 @@ struct TranslationPanelView: View {
     private func copyIconButton(action: @escaping () -> Void, label: String, disabled: Bool) -> some View {
         Button(action: action) {
             Image(systemName: "doc.on.doc")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(TranslationHoverButtonStyle(compact: true))
+        .disabled(disabled)
+        .help(label)
+        .accessibilityLabel(label)
+    }
+
+    private func speechIconButton(action: @escaping () -> Void, label: String, disabled: Bool) -> some View {
+        Button(action: action) {
+            Image(systemName: "speaker.wave.2")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 20, height: 20)

@@ -32,3 +32,42 @@ final class LineBreakNormalizerTests: XCTestCase {
         )
     }
 }
+
+final class OCRTextReconstructorTests: XCTestCase {
+    func testJoinsWrappedLatinLinesWithSpace() {
+        let lines = [
+            OCRTextLine(text: "A paragraph wraps onto", boundingBox: CGRect(x: 0.1, y: 0.8, width: 0.7, height: 0.08)),
+            OCRTextLine(text: "the following line.", boundingBox: CGRect(x: 0.1, y: 0.7, width: 0.55, height: 0.08))
+        ]
+        XCTAssertEqual(OCRTextReconstructor.reconstruct(lines), "A paragraph wraps onto the following line.")
+    }
+
+    func testJoinsCJKLinesWithoutSpace() {
+        let lines = [
+            OCRTextLine(text: "这是自动折行的", boundingBox: CGRect(x: 0.1, y: 0.8, width: 0.7, height: 0.08)),
+            OCRTextLine(text: "中文段落。", boundingBox: CGRect(x: 0.1, y: 0.7, width: 0.5, height: 0.08))
+        ]
+        XCTAssertEqual(OCRTextReconstructor.reconstruct(lines), "这是自动折行的中文段落。")
+    }
+
+    func testPreservesParagraphGapAndListItems() {
+        let lines = [
+            OCRTextLine(text: "First paragraph.", boundingBox: CGRect(x: 0.1, y: 0.82, width: 0.7, height: 0.06)),
+            OCRTextLine(text: "Second paragraph", boundingBox: CGRect(x: 0.1, y: 0.65, width: 0.7, height: 0.06)),
+            OCRTextLine(text: "• First item", boundingBox: CGRect(x: 0.1, y: 0.55, width: 0.5, height: 0.06)),
+            OCRTextLine(text: "• Second item", boundingBox: CGRect(x: 0.1, y: 0.45, width: 0.5, height: 0.06))
+        ]
+        XCTAssertEqual(
+            OCRTextReconstructor.reconstruct(lines),
+            "First paragraph.\nSecond paragraph\n• First item\n• Second item"
+        )
+    }
+
+    func testRepairsHyphenatedLatinWord() {
+        let lines = [
+            OCRTextLine(text: "A trans-", boundingBox: CGRect(x: 0.1, y: 0.8, width: 0.7, height: 0.08)),
+            OCRTextLine(text: "lation", boundingBox: CGRect(x: 0.1, y: 0.7, width: 0.3, height: 0.08))
+        ]
+        XCTAssertEqual(OCRTextReconstructor.reconstruct(lines), "A translation")
+    }
+}

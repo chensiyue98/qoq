@@ -438,6 +438,14 @@ final class TranslationModel: ObservableObject {
         copyToPasteboard(sourceText)
     }
 
+    func speakSourceText() {
+        speak(sourceText, language: sourceLanguage)
+    }
+
+    func speakTranslation() {
+        speak(translatedText, language: activeTargetLanguage)
+    }
+
     private func completeOutput(_ text: String, kind: TranslationOutputKind) {
         translatedText = text
         outputKind = kind
@@ -451,5 +459,16 @@ final class TranslationModel: ObservableObject {
         guard !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func speak(_ text: String, language: String?) {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: clean)
+        if let language, let voice = AVSpeechSynthesisVoice(language: language) {
+            utterance.voice = voice
+        }
+        speechSynthesizer.speak(utterance)
     }
 }
