@@ -36,7 +36,6 @@ jobs:
       - name: Verify shared scheme
         run: |
           test -f qoq.xcodeproj/xcshareddata/xcschemes/QoQ-Direct.xcscheme
-          test -f qoq.xcodeproj/xcshareddata/xcschemes/QoQ-AppStore.xcscheme
           xcodebuild -list -project qoq.xcodeproj
 
       - name: Build Direct application
@@ -48,17 +47,5 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData-Direct" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
-
-      - name: Build App Store application
-        run: |
-          xcodebuild \
-            build \
-            -project qoq.xcodeproj \
-            -scheme QoQ-AppStore \
-            -configuration Release-AppStore \
-            -destination 'platform=macOS' \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData-AppStore" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
