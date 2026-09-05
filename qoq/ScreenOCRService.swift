@@ -7,6 +7,26 @@ struct ScreenCapture {
     let image: CGImage
 }
 
+struct FrozenScreenCapture {
+    let image: CGImage
+    let screenSize: CGSize
+
+    func crop(to rect: NSRect) throws -> ScreenCapture {
+        let scaleX = CGFloat(image.width) / screenSize.width
+        let scaleY = CGFloat(image.height) / screenSize.height
+        let pixelRect = CGRect(
+            x: rect.minX * scaleX,
+            y: (screenSize.height - rect.maxY) * scaleY,
+            width: rect.width * scaleX,
+            height: rect.height * scaleY
+        ).integral.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard !pixelRect.isEmpty, let cropped = image.cropping(to: pixelRect) else {
+            throw ScreenCaptureError.captureFailed
+        }
+        return ScreenCapture(image: cropped)
+    }
+}
+
 enum ScreenCaptureError: LocalizedError {
     case captureFailed
     case noText
@@ -163,6 +183,21 @@ enum ScreenOCRService {
                 continuation.resume(returning: ScreenCapture(image: image))
             }
         }
+    }
+
+    static func freeze(screen: NSScreen) async throws -> FrozenScreenCapture {
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+            throw ScreenCaptureError.captureFailed
+        }
+        let displayBounds = CGDisplayBounds(CGDirectDisplayID(number.uint32Value))
+        let capture: CGImage = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CGImage, Error>) in
+            SCScreenshotManager.captureImage(in: displayBounds) { image, error in
+                if let error { continuation.resume(throwing: error); return }
+                guard let image else { continuation.resume(throwing: ScreenCaptureError.captureFailed); return }
+                continuation.resume(returning: image)
+            }
+        }
+        return FrozenScreenCapture(image: capture, screenSize: screen.frame.size)
     }
 
     static func recognize(_ image: CGImage) async throws -> String {

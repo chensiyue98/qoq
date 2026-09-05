@@ -30,22 +30,39 @@ final class ScreenSelectionController {
     }
 
     func begin() {
-        NSApp.activate(ignoringOtherApps: true)
-        for screen in NSScreen.screens {
-            let view = SelectionOverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
-            view.onCancel = { [weak self] in self?.finish(.failure(CancellationError())) }
-            view.onSelection = { [weak self, weak screen] localRect in
-                guard let self, let screen else { return }
-                let screenRect = localRect.offsetBy(dx: screen.frame.minX, dy: screen.frame.minY)
-                self.hideOverlays()
-                Task {
-                    do {
-                        await Task.yield()
-                        self.finish(.success(try await ScreenOCRService.capture(screen: screen, rect: screenRect)))
-                    } catch {
-                        self.finish(.failure(error))
+        let screens = NSScreen.screens
+        Task {
+            do {
+                let frozenScreens = try await withThrowingTaskGroup(of: (CGDirectDisplayID, FrozenScreenCapture).self) { group in
+                    for screen in screens {
+                        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { continue }
+                        let displayID = CGDirectDisplayID(number.uint32Value)
+                        group.addTask { (displayID, try await ScreenOCRService.freeze(screen: screen)) }
                     }
+                    var captures: [CGDirectDisplayID: FrozenScreenCapture] = [:]
+                    for try await (displayID, capture) in group { captures[displayID] = capture }
+                    return captures
                 }
+                presentOverlays(on: screens, frozenScreens: frozenScreens)
+            } catch {
+                finish(.failure(error))
+            }
+        }
+    }
+
+    private func presentOverlays(on screens: [NSScreen], frozenScreens: [CGDirectDisplayID: FrozenScreenCapture]) {
+        guard !finished else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        for screen in screens {
+            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
+                  let frozenScreen = frozenScreens[CGDirectDisplayID(number.uint32Value)] else { continue }
+            let view = SelectionOverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
+            view.frozenImage = frozenScreen.image
+            view.onCancel = { [weak self] in self?.finish(.failure(CancellationError())) }
+            view.onSelection = { [weak self] localRect in
+                guard let self else { return }
+                do { self.finish(.success(try frozenScreen.crop(to: localRect))) }
+                catch { self.finish(.failure(error)) }
             }
             let window = SelectionOverlayWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false, screen: screen)
             window.level = .screenSaver
@@ -78,6 +95,7 @@ final class ScreenSelectionController {
 }
 
 private final class SelectionOverlayView: NSView {
+    var frozenImage: CGImage?
     var onSelection: ((NSRect) -> Void)?
     var onCancel: (() -> Void)?
     private var start: NSPoint?
@@ -112,6 +130,9 @@ private final class SelectionOverlayView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        if let frozenImage {
+            NSGraphicsContext.current?.cgContext.draw(frozenImage, in: bounds)
+        }
         NSColor.black.withAlphaComponent(0.36).setFill()
         bounds.fill()
         let rect = selectionRect
